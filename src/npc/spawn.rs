@@ -143,10 +143,10 @@ pub fn spawn_npcs(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
-    world: &World,
+    existing_meshes: Option<Res<CharacterMeshes>>,
 ) {
     let layout = resort_layout();
-    let character_meshes = CharacterMeshes::get_or_insert(&mut meshes, &mut commands, world);
+    let character_meshes = CharacterMeshes::get_or_insert(&mut meshes, &mut commands, existing_meshes);
     let skin = materials.add(StandardMaterial {
         base_color: Color::srgb(0.78, 0.60, 0.46),
         perceptual_roughness: 0.85,

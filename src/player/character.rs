@@ -124,10 +124,18 @@ impl CharacterMeshes {
         }
     }
 
-    /// Load the shared meshes from the world if present, creating and inserting
+    /// Load the shared meshes if they already exist, creating and inserting
     /// them on first use.
-    pub fn get_or_insert(meshes: &mut Assets<Mesh>, commands: &mut Commands, world: &World) -> Self {
-        if let Some(existing) = world.get_resource::<CharacterMeshes>() {
+    ///
+    /// Callers pass `Option<Res<CharacterMeshes>>` rather than `&World`: a
+    /// shared `&World` parameter conflicts with the `ResMut<Assets<_>>`
+    /// parameters of the spawning systems.
+    pub fn get_or_insert(
+        meshes: &mut Assets<Mesh>,
+        commands: &mut Commands,
+        existing: Option<Res<CharacterMeshes>>,
+    ) -> Self {
+        if let Some(existing) = existing {
             return existing.clone();
         }
         let created = Self::create(meshes);

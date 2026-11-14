@@ -13,7 +13,7 @@ pub fn spawn_player(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
-    world: &World,
+    existing_meshes: Option<Res<CharacterMeshes>>,
 ) {
     let layout = resort_layout();
     let spawn = layout.player_spawn;
@@ -29,7 +29,7 @@ pub fn spawn_player(
         .id();
 
     // --- Procedural body -------------------------------------------------
-    let character_meshes = CharacterMeshes::get_or_insert(&mut meshes, &mut commands, world);
+    let character_meshes = CharacterMeshes::get_or_insert(&mut meshes, &mut commands, existing_meshes);
     let mat = |materials: &mut Assets<StandardMaterial>, color: Color| {
         materials.add(StandardMaterial {
             base_color: color,

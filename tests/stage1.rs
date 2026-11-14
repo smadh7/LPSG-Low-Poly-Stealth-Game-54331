@@ -4,7 +4,7 @@
 //! minimal Bevy app so movement, collision, NPC routines and interaction are
 //! verified by machinery, not by eye.
 
-use bevy::prelude::*;
+use bevy::{prelude::*, time::PhysicsSchedule};
 use hitman_lowpoly::core::Circle2;
 use hitman_lowpoly::interaction::actions::NoticeFeed;
 use hitman_lowpoly::interaction::{FocusTarget, InteractAction, InteractKind, Interactable};
@@ -37,11 +37,11 @@ fn player_body(app: &mut App) -> ActorBody {
 /// The headless app does not advance real time, so driving `FixedUpdate`
 /// directly makes the simulation deterministic and fast.
 fn step(app: &mut App, frames: usize) {
+    // `PhysicsSchedule` is the schedule Bevy's `TimePlugin` runs once per fixed
+    // timestep; it advances `Time<Fixed>` and then runs `FixedUpdate`. Running
+    // it directly makes the simulation deterministic and instant.
     for _ in 0..frames {
-        app.world_mut()
-            .resource_mut::<Time<Fixed>>()
-            .advance_by(std::time::Duration::from_secs_f64(1.0 / 60.0));
-        app.world_mut().run_schedule(FixedUpdate);
+        app.world_mut().run_schedule(PhysicsSchedule);
     }
 }
 
