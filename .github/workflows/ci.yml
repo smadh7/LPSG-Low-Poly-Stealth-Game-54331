@@ -132,6 +132,71 @@ jobs:
             exit 1
           fi
 
+  smoke:
+    name: Launch smoke test (headless renderer)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends \
+            libasound2-dev libudev-dev pkg-config libwayland-dev libxkbcommon-dev \
+            mesa-vulkan-drivers libvulkan1 vulkan-tools libx11-dev libxi-dev \
+            xvfb
+          sudo apt-get install -y --no-install-recommends mesa-utils 2>/dev/null || true
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: linux-smoke
+      - name: Build the game binary
+        run: cargo build --bin hitman_lowpoly
+      - name: Run the real game for 300 frames
+        env:
+          HITMAN_SMOKE_FRAMES: "300"
+          WGPU_BACKEND: vulkan
+          LIBGL_ALWAYS_SOFTWARE: "1"
+          RUST_LOG: info
+        run: |
+          set -o pipefail
+          # Software Vulkan (lavapipe) inside a virtual X server: this exercises
+          # the full engine — window, renderer, all gameplay plugins — with no GPU.
+          xvfb-run -a -s "-screen 0 1600x900x24" \
+            vulkaninfo --summary > /dev/null 2>&1 || echo "vulkaninfo unavailable (continuing)"
+          timeout 600 xvfb-run -a -s "-screen 0 1600x900x24" \
+            ./target/debug/hitman_lowpoly 2>&1 | tee smoke.log
+          grep -q "SMOKE OK" smoke.log || { echo "::error::game did not reach the smoke-test exit"; tail -50 smoke.log; exit 1; }
+          grep -q "npcs [1-9]" smoke.log || { echo "::error::no NPCs were spawned"; exit 1; }
+          echo "smoke test passed"
+      - name: Publish smoke log
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.sha }}
+        run: |
+          python3 - <<'PY'
+          import json, os, urllib.request
+          if not os.path.exists("smoke.log"):
+              raise SystemExit(0)
+          lines = open("smoke.log", errors="replace").read().splitlines()
+          keep = [l for l in lines if "SMOKE" in l or "ERROR" in l or "panic" in l or "error" in l]
+          body = "**Smoke test log** " + os.environ["SHA"][:8] + "\n```\n" + "\n".join(keep)[-30000:] + "\n```\n"
+          req = urllib.request.Request(
+              "https://api.github.com/repos/" + os.environ["REPO"] + "/commits/" + os.environ["SHA"] + "/comments",
+              data=json.dumps({"body": body[:65000]}).encode(),
+              headers={"Authorization": "Bearer " + os.environ["GH_TOKEN"],
+                       "Accept": "application/vnd.github+json",
+                       "Content-Type": "application/json", "User-Agent": "ci"},
+              method="POST")
+          try:
+              with urllib.request.urlopen(req) as r:
+                  print("posted smoke log", r.status)
+          except Exception as e:
+              print("post failed", e)
+          PY
+
   windows:
     name: Build Windows release
     if: github.event_name == 'workflow_dispatch' && inputs.windows
