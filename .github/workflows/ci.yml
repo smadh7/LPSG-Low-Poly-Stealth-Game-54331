@@ -98,6 +98,8 @@ jobs:
                   keep = lines
               text = "\n".join(keep)
               open(dst, "w").write(text[-limit:])
+              # raw tail keeps multi-line panic messages intact
+              open(dst.replace(".txt", "-raw.txt"), "w").write("\n".join(lines)[-limit:])
           PY
           cd out
           git init -q -b ci-logs
@@ -181,8 +183,7 @@ jobs:
           if not os.path.exists("smoke.log"):
               raise SystemExit(0)
           lines = open("smoke.log", errors="replace").read().splitlines()
-          keep = [l for l in lines if "SMOKE" in l or "ERROR" in l or "panic" in l or "error" in l
-                  or "System" in l or "Entity" in l or "entity" in l or "not " in l or "Param" in l]
+          keep = lines
           body = "**Smoke test log** " + os.environ["SHA"][:8] + "\n```\n" + "\n".join(keep)[-30000:] + "\n```\n"
           req = urllib.request.Request(
               "https://api.github.com/repos/" + os.environ["REPO"] + "/commits/" + os.environ["SHA"] + "/comments",

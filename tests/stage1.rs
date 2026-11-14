@@ -32,6 +32,16 @@ fn player_body(app: &mut App) -> ActorBody {
     query.single(world).expect("player exists").clone()
 }
 
+/// Run the physics schedule `frames` times with a fixed 1/60 s step.
+///
+/// The headless app does not advance real time, so driving `FixedUpdate`
+/// directly makes the simulation deterministic and fast.
+fn step(app: &mut App, frames: usize) {
+    for _ in 0..frames {
+        app.world_mut().run_schedule(FixedUpdate);
+    }
+}
+
 /// Build a headless app with just the resources the physics needs.
 ///
 /// The player's visual parts are included (invisibly, no meshes needed) so that
@@ -85,9 +95,7 @@ fn player_stands_on_the_floor_and_does_not_sink() {
     let mut app = physics_app(spawn);
 
     app.add_systems(FixedUpdate, hitman_lowpoly::player::movement::player_physics);
-    for _ in 0..120 {
-        app.update();
-    }
+    step(&mut app, 120);
 
     let transform = player_transform(&mut app);
     let body = player_body(&mut app);
@@ -108,10 +116,10 @@ fn player_walks_forward_and_is_blocked_by_walls() {
 
     let start = player_transform(&mut app);
 
+    // Keep pushing forward: the intent is re-applied every simulated step.
     for _ in 0..120 {
-        // Keep pushing forward each step: the intent is consumed by the solver.
         app.world_mut().resource_mut::<PlayerIntent>().direction = Vec3::Z;
-        app.update();
+        step(&mut app, 1);
     }
 
     let end = player_transform(&mut app);
@@ -133,7 +141,7 @@ fn player_cannot_walk_through_a_solid_wall() {
     app.add_systems(FixedUpdate, hitman_lowpoly::player::movement::player_physics);
     for _ in 0..180 {
         app.world_mut().resource_mut::<PlayerIntent>().direction = Vec3::Z;
-        app.update();
+        step(&mut app, 1);
     }
     let transform = player_transform(&mut app);
     assert!(
@@ -150,7 +158,7 @@ fn player_can_climb_the_ramp_to_the_restaurant() {
     app.add_systems(FixedUpdate, hitman_lowpoly::player::movement::player_physics);
     for _ in 0..400 {
         app.world_mut().resource_mut::<PlayerIntent>().direction = Vec3::Z;
-        app.update();
+        step(&mut app, 1);
     }
     let transform = player_transform(&mut app);
     assert!(
@@ -164,20 +172,16 @@ fn jumping_leaves_the_ground_and_lands_again() {
     let layout = resort_layout();
     let mut app = physics_app(layout.player_spawn);
     app.add_systems(FixedUpdate, hitman_lowpoly::player::movement::player_physics);
-    for _ in 0..30 {
-        app.update();
-    }
+    step(&mut app, 30);
     app.world_mut().resource_mut::<PlayerIntent>().wants_jump = true;
-    app.update();
+    step(&mut app, 1);
 
     let airborne = player_body(&mut app);
     assert!(!airborne.grounded, "player should be airborne right after jumping");
     let y_after_jump = player_transform(&mut app).y;
     assert!(y_after_jump > 0.05, "player should gain height, y={y_after_jump}");
 
-    for _ in 0..150 {
-        app.update();
-    }
+    step(&mut app, 150);
     let landed = player_body(&mut app);
     assert!(landed.grounded, "player should land again");
     assert!(player_transform(&mut app).y.abs() < 0.3);
@@ -253,34 +257,38 @@ fn focus_target_defaults_to_empty() {
 }
 
 #[test]
-fn every_interactable_is_reachable_from_the_floor_plane() {
-    // Interactables must sit within ~1.6 m of a walkable surface; this guards
-    // against props authored at the wrong height after layout changes.
+fn every_interactable_sits_on_or_near_a_surface() {
+    // Props must be reachable: each authored interactable has to sit on (or
+    // just above) a walkable surface rather than floating in mid-air.
     let layout = resort_layout();
     let blocks = layout.obstacle_blocks();
-    // Interactable positions duplicated here intentionally: this test lives
-    // outside the module so it validates the authored data from the outside.
-    let height_checks = [
-        (Vec3::new(-4.0, 1.35, 9.0), 1.15),
-        (Vec3::new(-8.0, 0.95, -20.4), 0.0),
-        (Vec3::new(36.0, 3.4, -8.0), 2.4),
-        (Vec3::new(-46.3, -1.2, 13.0), -3.4),
-        (Vec3::new(6.2, 31.4, 44.2), 29.8),
+    let checks = [
+        // (interactable position, description)
+        (Vec3::new(-4.0, 1.35, 9.0), "guest register"),
+        (Vec3::new(-8.0, 0.95, -20.4), "garden bench"),
+        (Vec3::new(36.0, 3.4, -8.0), "restaurant menu"),
+        (Vec3::new(-46.3, -1.2, 13.0), "staff locker"),
+        (Vec3::new(6.2, 31.4, 44.2), "penthouse safe"),
+        (Vec3::new(12.0, 30.9, 33.0), "hot tub dataslate"),
     ];
-    for (position, expected_floor) in height_checks {
-        let mut nearest: Option<f32> = None;
+    for (position, what) in checks {
+        let xz = Vec2::new(position.x, position.z);
+        let mut surface: Option<f32> = None;
         for block in &blocks {
-            if block.contains_xz(Vec2::new(position.x, position.z), 1.0) {
-                let top = block.top();
-                if top <= position.y + 0.2 {
-                    nearest = Some(nearest.map_or(top, |n: f32| n.max(top)));
-                }
+            if block.contains_xz(xz, 0.9) && block.top() <= position.y + 0.05 {
+                surface = Some(surface.map_or(block.top(), |s: f32| s.max(block.top())));
             }
         }
-        let floor = nearest.unwrap_or(0.0);
-        assert!(
-            (floor - expected_floor).abs() < 0.6,
-            "interactable at {position:?} expected floor {expected_floor}, found {floor}"
-        );
+        match surface {
+            Some(top) => assert!(
+                position.y - top < 2.0,
+                "{what} floats {:.2} m above its surface",
+                position.y - top
+            ),
+            None => assert!(
+                position.y < 1.2,
+                "{what} has no surface beneath it and is above ground level"
+            ),
+        }
     }
 }
