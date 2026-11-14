@@ -16,18 +16,18 @@ use bevy::{ecs::query::QueryData, prelude::*};
 /// Optional markers for the left-hand status texts.
 #[derive(QueryData)]
 pub struct StatusTextParts {
-    pub stance: Option<StanceText>,
-    pub zone: Option<ZoneText>,
-    pub compass: Option<CompassText>,
+    pub stance: Has<StanceText>,
+    pub zone: Has<ZoneText>,
+    pub compass: Has<CompassText>,
 }
 
 /// Marker/flag bundle for the HUD texts that `update_hud_detail` updates.
 #[derive(QueryData)]
 pub struct HudTextParts {
-    pub prompt: Option<PromptText>,
-    pub detail: Option<PromptDetail>,
-    pub inventory: Option<InventoryText>,
-    pub outfit: Option<OutfitText>,
+    pub prompt: Has<PromptText>,
+    pub detail: Has<PromptDetail>,
+    pub inventory: Has<InventoryText>,
+    pub outfit: Has<OutfitText>,
 }
 
 /// Root of all in-game HUD nodes.
@@ -336,20 +336,23 @@ pub fn update_hud_status(
     let compass = format!("{}   {:03.0} deg", directions[index], heading);
 
     for (mut text, parts) in &mut texts {
-        let stance = parts.stance;
-        let zone = parts.zone;
-        let compass_marker = parts.compass;
-        if stance.is_some() && cache.last_stance != stance_label {
-            **text = stance_label.to_string();
-            cache.last_stance = stance_label.to_string();
-        } else if zone.is_some() && cache.last_zone != zone_label {
-            **text = zone_label.clone();
-            cache.last_zone = zone_label.clone();
-        } else if compass_marker.is_some() && cache.last_compass != compass {
-            **text = compass.clone();
-            cache.last_compass = compass.clone();
+        if parts.stance {
+            if cache.last_stance != stance_label {
+                **text = stance_label.to_string();
+            }
+        } else if parts.zone {
+            if cache.last_zone != zone_label {
+                **text = zone_label.clone();
+            }
+        } else if parts.compass {
+            if cache.last_compass != compass {
+                **text = compass.clone();
+            }
         }
     }
+    cache.last_stance = stance_label.to_string();
+    cache.last_zone = zone_label;
+    cache.last_compass = compass;
     let _ = &focus;
 }
 
@@ -387,11 +390,7 @@ pub fn update_hud_detail(
     };
     let outfit_label = format!("Outfit: {}", player_state.outfit.display_name());
     for (parts, mut text) in &mut singles {
-        let prompt = parts.prompt;
-        let detail = parts.detail;
-        let inventory_marker = parts.inventory;
-        let outfit = parts.outfit;
-        if let Some(_prompt) = prompt {
+        if parts.prompt {
             let value = if focus.exhausted {
                 format!("{}  (used)", focus.prompt)
             } else {
@@ -400,13 +399,13 @@ pub fn update_hud_detail(
             if text.0 != value {
                 **text = value;
             }
-        } else if detail.is_some() && text.0 != focus.description {
+        } else if parts.detail && text.0 != focus.description {
             **text = focus.description.clone();
-        } else if inventory_marker.is_some() {
+        } else if parts.inventory {
             if cache.last_inventory != inventory {
                 **text = inventory.clone();
             }
-        } else if outfit.is_some() && text.0 != outfit_label {
+        } else if parts.outfit && text.0 != outfit_label {
             **text = outfit_label.clone();
         }
     }
