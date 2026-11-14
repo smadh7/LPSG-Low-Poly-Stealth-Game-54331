@@ -32,12 +32,6 @@ pub struct Step {
     pub block_index: usize,
 }
 
-/// Convert a colour to the format stored in vertex attributes.
-fn to_linear(color: Color) -> [f32; 4] {
-    let linear = color.to_linear();
-    [linear.red, linear.green, linear.blue, linear.alpha]
-}
-
 /// Append a single solid to a mesh accumulator (targeted chunks with blocks).
 fn add_solid(acc: &mut MeshAccumulator, solid: &SolidSpec) {
     acc.add_box(solid.center, solid.size, solid.color);
@@ -270,8 +264,10 @@ mod tests {
     }
 
     #[test]
-    fn colour_conversion_preserves_alpha() {
-        let c = to_linear(Color::srgba(1.0, 0.5, 0.25, 0.7));
-        assert!((c[3] - 0.7).abs() < 1e-5);
+    fn mesh_vertex_counts_are_consistent() {
+        let layout = resort_layout();
+        let mesh = build_solid_mesh(&layout.solids);
+        let indices = mesh.indices().expect("solids have indices");
+        assert_eq!(indices.len() % 3, 0, "triangle list must be complete");
     }
 }

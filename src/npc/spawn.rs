@@ -189,7 +189,7 @@ pub fn spawn_npcs(
             zone: spec.zone,
         };
         let npc_name = spec.name;
-        let speed_hint = spec.speed_hint;
+        let _speed_hint = spec.speed_hint;
         let brain = spec.into_brain();
 
         let npc = commands

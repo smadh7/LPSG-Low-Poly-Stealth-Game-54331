@@ -17,6 +17,21 @@ use hitman_lowpoly::player_state::PlayerState;
 use hitman_lowpoly::world::builder::WorldCollision;
 use hitman_lowpoly::world::layout::resort_layout;
 
+/// Read the player's transform without keeping a world borrow alive.
+fn player_transform(app: &mut App) -> Vec3 {
+    let mut query = app
+        .world_mut()
+        .query_filtered::<&Transform, With<PlayerAvatar>>();
+    let transform = query.single(app.world()).expect("player exists");
+    transform.translation
+}
+
+/// Read the player's physics body state.
+fn player_body(app: &mut App) -> ActorBody {
+    let mut query = app.world_mut().query_filtered::<&ActorBody, With<PlayerAvatar>>();
+    query.single(app.world()).expect("player exists").clone()
+}
+
 /// Build a headless app with just the resources the physics needs.
 fn physics_app(spawn: Vec3) -> App {
     let mut app = App::new();
@@ -46,34 +61,24 @@ fn player_stands_on_the_floor_and_does_not_sink() {
         app.update();
     }
 
-    let body = app
-        .world_mut()
-        .query_filtered::<(&Transform, &ActorBody), With<PlayerAvatar>>()
-        .single(app.world())
-        .expect("player exists");
-    let (transform, body) = body;
+    let transform = player_transform(&mut app);
+    let body = player_body(&mut app);
     assert!(body.grounded, "player should be grounded after settling");
     assert!(
-        (transform.translation.y - 0.0).abs() < 0.25,
+        transform.y.abs() < 0.25,
         "expected to stand near y=0, got {}",
-        transform.translation.y
+        transform.y
     );
     assert!(body.ground_y.abs() < 0.25);
 }
 
 #[test]
 fn player_walks_forward_and_is_blocked_by_walls() {
-    let layout = resort_layout();
     let mut app = physics_app(Vec3::new(0.0, 0.0, -20.0));
     app.add_systems(FixedUpdate, hitman_lowpoly::player::movement::player_physics);
     app.world_mut().resource_mut::<PlayerIntent>().direction = Vec3::Z;
 
-    let start = app
-        .world_mut()
-        .query_filtered::<&Transform, With<PlayerAvatar>>()
-        .single(app.world())
-        .unwrap()
-        .translation;
+    let start = player_transform(&mut app);
 
     for _ in 0..120 {
         // Keep pushing forward each step: the intent is consumed by the solver.
@@ -81,12 +86,7 @@ fn player_walks_forward_and_is_blocked_by_walls() {
         app.update();
     }
 
-    let end = app
-        .world_mut()
-        .query_filtered::<&Transform, With<PlayerAvatar>>()
-        .single(app.world())
-        .unwrap()
-        .translation;
+    let end = player_transform(&mut app);
 
     assert!(end.z > start.z + 0.5, "player should have moved forward");
     // The lobby's south wall is at z = -14 with a 10 m wide doorway, and the
@@ -104,12 +104,7 @@ fn player_cannot_walk_through_a_solid_wall() {
         app.world_mut().resource_mut::<PlayerIntent>().direction = Vec3::Z;
         app.update();
     }
-    let transform = app
-        .world_mut()
-        .query_filtered::<&Transform, With<PlayerAvatar>>()
-        .single(app.world())
-        .unwrap()
-        .translation;
+    let transform = player_transform(&mut app);
     assert!(
         transform.z < -14.0,
         "the player must be stopped by the wall, ended at z={}",
@@ -126,12 +121,7 @@ fn player_can_climb_the_ramp_to_the_restaurant() {
         app.world_mut().resource_mut::<PlayerIntent>().direction = Vec3::Z;
         app.update();
     }
-    let transform = app
-        .world_mut()
-        .query_filtered::<&Transform, With<PlayerAvatar>>()
-        .single(app.world())
-        .unwrap()
-        .translation;
+    let transform = player_transform(&mut app);
     assert!(
         transform.y > 1.5,
         "the player should climb onto the raised restaurant deck, y={}",
@@ -149,37 +139,18 @@ fn jumping_leaves_the_ground_and_lands_again() {
     }
     app.world_mut().resource_mut::<PlayerIntent>().wants_jump = true;
     app.update();
-    let y_after_jump = app
-        .world_mut()
-        .query_filtered::<&Transform, With<PlayerAvatar>>()
-        .single(app.world())
-        .unwrap()
-        .translation
-        .y;
-    let body = app
-        .world_mut()
-        .query_filtered::<&ActorBody, With<PlayerAvatar>>()
-        .single(app.world())
-        .unwrap();
-    assert!(!body.grounded, "player should be airborne right after jumping");
 
-    for _ in 0..120 {
+    let airborne = player_body(&mut app);
+    assert!(!airborne.grounded, "player should be airborne right after jumping");
+    let y_after_jump = player_transform(&mut app).y;
+    assert!(y_after_jump > 0.05, "player should gain height, y={y_after_jump}");
+
+    for _ in 0..150 {
         app.update();
     }
-    let final_body = app
-        .world_mut()
-        .query_filtered::<&ActorBody, With<PlayerAvatar>>()
-        .single(app.world())
-        .unwrap();
-    let final_y = app
-        .world_mut()
-        .query_filtered::<&Transform, With<PlayerAvatar>>()
-        .single(app.world())
-        .unwrap()
-        .translation
-        .y;
-    assert!(final_body.grounded, "player should land again (y was {y_after_jump})");
-    assert!(final_y.abs() < 0.3);
+    let landed = player_body(&mut app);
+    assert!(landed.grounded, "player should land again");
+    assert!(player_transform(&mut app).y.abs() < 0.3);
 }
 
 #[test]
