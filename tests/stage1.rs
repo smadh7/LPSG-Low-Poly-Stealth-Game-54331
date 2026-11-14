@@ -93,6 +93,20 @@ fn spawn_test_player(mut commands: Commands, spawn: Res<PendingPlayerSpawn>) {
 }
 
 #[test]
+fn debug_physics_moves_at_all() {
+    let mut app = physics_app(Vec3::new(0.0, 0.0, -20.0));
+    app.add_systems(FixedUpdate, hitman_lowpoly::player::movement::player_physics);
+    println!("obstacles: {}", app.world().resource::<WorldCollision>().blocks.len());
+    for i in 0..3 {
+        app.world_mut().resource_mut::<PlayerIntent>().direction = Vec3::Z;
+        step(&mut app, 20);
+        let body = player_body(&mut app);
+        println!("step {i}: pos={:?} vel={:?} grounded={}", player_transform(&mut app), body.velocity, body.grounded);
+    }
+    panic!("debug output above");
+}
+
+#[test]
 fn player_stands_on_the_floor_and_does_not_sink() {
     let layout = resort_layout();
     let spawn = layout.player_spawn;

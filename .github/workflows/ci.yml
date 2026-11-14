@@ -157,6 +157,7 @@ jobs:
       - name: Run the real game for 300 frames
         env:
           HITMAN_SMOKE_FRAMES: "300"
+          RUST_BACKTRACE: full
           WGPU_BACKEND: vulkan
           LIBGL_ALWAYS_SOFTWARE: "1"
           RUST_LOG: info

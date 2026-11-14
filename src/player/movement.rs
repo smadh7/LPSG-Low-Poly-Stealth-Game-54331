@@ -116,8 +116,13 @@ pub fn player_physics(
     // Ground acceleration vs. air control.
     let accel = if body.grounded { 26.0 } else { 7.0 };
     let desired_horizontal = horizontal_input * target_speed;
+    // Step the local velocity *and* publish it back on the body so other
+    // systems (animation, HUD, audio) see the same value the solver used.
     let current_horizontal = Vec3::new(body.velocity.x, 0.0, body.velocity.z);
-    let new_horizontal = current_horizontal.move_towards(desired_horizontal, accel * dt);
+    let moved_horizontal = current_horizontal.move_towards(desired_horizontal, accel * dt);
+    body.velocity.x = moved_horizontal.x;
+    body.velocity.z = moved_horizontal.z;
+    let new_horizontal = moved_horizontal;
 
     // --- Jump -----------------------------------------------------------
     if intent.wants_jump && body.grounded && !crouched {
@@ -130,9 +135,6 @@ pub fn player_physics(
     if !body.grounded {
         body.velocity.y += GRAVITY * dt;
     }
-
-    body.velocity.x = new_horizontal.x;
-    body.velocity.z = new_horizontal.z;
 
     // --- Horizontal movement with collision -----------------------------
     let mut position = transform.translation;
