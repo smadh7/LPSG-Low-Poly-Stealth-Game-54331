@@ -150,8 +150,8 @@ pub fn spawn_humanoid(
     marker: Option<PlayerVisual>,
 ) -> Vec<Entity> {
     let mut spawned = Vec::new();
-    let mut parts: Vec<(Handle<Mesh>, Handle<StandardMaterial>, Vec3, Option<Limb>)> = vec![
-        (meshes.torso.clone(), torso_mat, HumanoidRig::TORSO, Some(Limb::Torso)),
+    let parts: Vec<(Handle<Mesh>, Handle<StandardMaterial>, Vec3, Option<Limb>)> = vec![
+        (meshes.torso.clone(), torso_mat.clone(), HumanoidRig::TORSO, Some(Limb::Torso)),
         (meshes.head.clone(), skin_mat.clone(), HumanoidRig::HEAD, Some(Limb::Head)),
         (meshes.hair.clone(), hair_mat, HumanoidRig::HEAD + Vec3::Y * 0.02, None),
         (meshes.leg.clone(), legs_mat.clone(), HumanoidRig::LEFT_LEG, Some(Limb::LeftLeg)),

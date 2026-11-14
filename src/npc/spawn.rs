@@ -188,12 +188,13 @@ pub fn spawn_npcs(
             role: spec.role,
             zone: spec.zone,
         };
+        let npc_name = spec.name;
         let speed_hint = spec.speed_hint;
         let brain = spec.into_brain();
 
         let npc = commands
             .spawn((
-                Name::new(spec.name),
+                Name::new(npc_name),
                 Npc,
                 identity,
                 brain,

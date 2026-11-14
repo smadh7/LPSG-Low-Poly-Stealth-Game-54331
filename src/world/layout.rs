@@ -644,7 +644,7 @@ mod tests {
         let spawn = l.player_spawn;
         assert_eq!(l.zone_at(Vec2::new(spawn.x, spawn.z)), Gardens);
         for block in l.obstacle_blocks() {
-            let c = super::super::core::Circle2 {
+            let c = crate::core::Circle2 {
                 center: Vec2::new(spawn.x, spawn.z),
                 radius: 0.4,
             };

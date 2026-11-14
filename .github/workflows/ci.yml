@@ -121,8 +121,16 @@ jobs:
           retention-days: 14
 
       - name: Fail if anything failed
-        if: steps.check.outcome != 'success' || steps.test.outcome != 'success'
-        run: exit 1
+        if: always()
+        env:
+          CHECK: ${{ steps.check.outcome }}
+          TEST: ${{ steps.test.outcome }}
+        run: |
+          echo "check=$CHECK test=$TEST"
+          if [ "$CHECK" != "success" ] || [ "$TEST" != "success" ]; then
+            echo "::error::cargo check or cargo test failed"
+            exit 1
+          fi
 
   windows:
     name: Build Windows release
