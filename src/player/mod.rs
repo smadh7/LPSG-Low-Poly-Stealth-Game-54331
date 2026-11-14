@@ -55,9 +55,17 @@ impl Plugin for PlayerPlugin {
         app.init_resource::<PlayerIntent>()
             .init_resource::<camera::CameraRig>()
             .add_systems(Startup, spawn::spawn_player)
-            .add_systems(Update, (movement::read_input, camera::camera_look, camera::camera_follow).chain())
-            .add_systems(FixedUpdate, movement::player_physics)
-            .add_systems(Update, movement::update_ground_state.after(camera::camera_follow));
+            .add_systems(
+                Update,
+                (
+                    movement::read_input,
+                    camera::camera_look,
+                    character::sync_body_parts,
+                    camera::camera_follow,
+                )
+                    .chain(),
+            )
+            .add_systems(FixedUpdate, movement::player_physics);
     }
 }
 

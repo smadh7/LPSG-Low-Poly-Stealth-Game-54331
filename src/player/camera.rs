@@ -54,6 +54,9 @@ impl CameraRig {
     }
 
     /// Camera-relative movement basis on the ground plane.
+    ///
+    /// `forward` points away from the camera, `right` is 90 degrees clockwise
+    /// when viewed from above so that `W`, `D` map to intuitive directions.
     pub fn movement_basis(&self) -> (Vec3, Vec3) {
         let forward = Vec3::new(self.yaw.sin(), 0.0, self.yaw.cos());
         let right = Vec3::new(forward.z, 0.0, -forward.x);
@@ -81,12 +84,10 @@ pub fn camera_look(
         return;
     }
 
-    rig.yaw -= delta.x * rig.sensitivity;
+    rig.yaw += delta.x * rig.sensitivity;
     rig.pitch = (rig.pitch - delta.y * rig.sensitivity)
         .clamp(-FRAC_PI_3 - 0.15, FRAC_PI_2 - 0.35);
-    if rig.yaw.abs() > std::f32::consts::TAU {
-        rig.yaw = rig.yaw.rem_euclid(std::f32::consts::TAU);
-    }
+    rig.yaw = rig.yaw.rem_euclid(std::f32::consts::TAU);
     intent.look += delta;
 }
 
@@ -142,34 +143,27 @@ pub fn camera_follow(
 
 /// Cheap ray march against the world's axis aligned boxes.
 ///
-/// Returns the distance to the first hit, if any.
-pub fn raycast_blocks(origin: Vec3, dir: Vec3, max_distance: f32, blocks: &[crate::core::Block2]) -> Option<f32> {
-    let dir2 = Vec2::new(dir.x, dir.z);
-    let mut best: Option<f32> = None;
-
-    // March the ray in small steps and test the horizontal point against each
-    // block; precise enough for camera occlusion and interaction checks.
-    let steps = ((max_distance / 0.12).ceil() as usize).max(1);
+/// Returns the distance to the first hit, if any. The step size is small
+/// enough for camera occlusion and interaction checks, and the resort only has
+/// a few dozen boxes to test per step.
+pub fn raycast_blocks(
+    origin: Vec3,
+    dir: Vec3,
+    max_distance: f32,
+    blocks: &[crate::core::Block2],
+) -> Option<f32> {
+    let steps = ((max_distance / 0.15).ceil() as usize).max(1);
     for step in 1..=steps {
         let t = max_distance * step as f32 / steps as f32;
         let p = origin + dir * t;
         let p2 = Vec2::new(p.x, p.z);
-        let _ = dir2;
         for block in blocks {
             if block.contains_xz(p2, 0.0) && p.y >= block.bottom() && p.y <= block.top() + 0.05 {
-                beam_hit(&mut best, t);
-                return best;
+                return Some(t);
             }
         }
     }
     None
-}
-
-fn beam_hit(best: &mut Option<f32>, t: f32) {
-    *best = match *best {
-        Some(existing) => Some(existing.min(t)),
-        None => Some(t),
-    };
 }
 
 /// Smoothly look the camera towards a yaw angle (used by scripted moments).

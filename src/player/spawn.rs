@@ -1,38 +1,62 @@
-//! Spawns the player character and the third-person camera.
+//! Spawns the player character, the third-person camera and the player's
+//! personal fill light.
 
 use super::camera::{CameraRig, ThirdPersonCamera};
-use super::character::{spawn_avatar_visual, ActorBody, PlayerAvatar};
-use crate::core::VIEW_MODEL_LAYER;
-use crate::world::builder::LevelEntity;
-use crate::world::layout::resort_layout;
-use crate::world::sky;
-use bevy::{
-    core_pipeline::tonemapping::Tonemapping,
-    prelude::*,
-    render::view::RenderLayers,
+use super::character::{
+    outfit_colors, spawn_humanoid, ActorBody, CharacterMeshes, PlayerAvatar, PlayerVisual,
 };
+use crate::core::{VIEW_MODEL_LAYER, WORLD_LAYER};
+use crate::world::layout::resort_layout;
+use bevy::{core_pipeline::tonemapping::Tonemapping, prelude::*, render::view::RenderLayers};
 
 pub fn spawn_player(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
+    world: &World,
 ) {
     let layout = resort_layout();
     let spawn = layout.player_spawn;
 
+    // --- Actor root ------------------------------------------------------
     let player = commands
         .spawn((
             Name::new("Player"),
             PlayerAvatar,
             ActorBody::default(),
             Transform::from_translation(spawn),
-            Visibility::default(),
         ))
         .id();
 
-    spawn_avatar_visual(&mut commands, player, &mut meshes, &mut materials);
+    // --- Procedural body -------------------------------------------------
+    let character_meshes = CharacterMeshes::get_or_insert(&mut meshes, &mut commands, world);
+    let mat = |materials: &mut Assets<StandardMaterial>, color: Color| {
+        materials.add(StandardMaterial {
+            base_color: color,
+            perceptual_roughness: 0.85,
+            ..default()
+        })
+    };
+    let shirt = mat(&mut materials, outfit_colors::SHIRT);
+    let trousers = mat(&mut materials, outfit_colors::TROUSERS);
+    let skin = mat(&mut materials, outfit_colors::SKIN);
+    let hair = mat(&mut materials, outfit_colors::HAIR);
+    let shoes = mat(&mut materials, outfit_colors::SHOES);
 
-    // Third person camera; HDR + tonemapping for a warm, filmic look.
+    spawn_humanoid(
+        &mut commands,
+        player,
+        spawn,
+        &character_meshes,
+        shirt,
+        trousers,
+        skin,
+        hair,
+        shoes,
+        Some(PlayerVisual),
+    );
+
+    // --- Camera ----------------------------------------------------------
     commands.spawn((
         Name::new("Player Camera"),
         ThirdPersonCamera,
@@ -45,45 +69,52 @@ pub fn spawn_player(
         Projection::from(PerspectiveProjection {
             fov: 68f32.to_radians(),
             near: 0.08,
-            far: 800.0,
+            far: 900.0,
             ..default()
         }),
-        // The world camera must see both the world and the player's model.
-        RenderLayers::from_layers(&[crate::core::WORLD_LAYER, VIEW_MODEL_LAYER]),
-        Transform::from_translation(spawn + Vec3::new(0.0, 3.0, -6.0))
-            .looking_at(spawn + Vec3::Y * 1.4, Vec3::Y),
+        // The world camera must see the world *and* the player's own model.
+        RenderLayers::from_layers(&[WORLD_LAYER, VIEW_MODEL_LAYER]),
+        Transform::from_translation(spawn + Vec3::new(0.0, 3.2, -6.0))
+            .looking_at(spawn + Vec3::Y * 1.5, Vec3::Y),
         bevy::pbr::DistanceFog {
-            color: Color::srgba(0.72, 0.80, 0.86, 1.0),
+            color: Color::srgba(0.70, 0.79, 0.86, 1.0),
             falloff: bevy::pbr::FogFalloff::Linear {
-                start: 60.0,
-                end: 190.0,
+                start: 70.0,
+                end: 210.0,
             },
             ..default()
         },
     ));
 
-    // A small warm light that follows the player keeps the character readable
-    // even in shaded corridors.
+    // --- Personal fill light --------------------------------------------
     commands.spawn((
         Name::new("Player Fill Light"),
-        LevelEntity,
         PointLight {
             color: Color::srgb(1.0, 0.95, 0.88),
-            intensity: 22_000.0,
-            range: 9.0,
+            intensity: 16_000.0,
+            range: 10.0,
             shadows_enabled: false,
             ..default()
         },
-        Transform::from_translation(spawn + Vec3::Y * 3.0),
+        Transform::from_translation(spawn + Vec3::Y * 2.6),
     ));
 
+    // --- Camera rig resource --------------------------------------------
     let mut rig = CameraRig::default();
     rig.pivot = spawn + Vec3::Y * 1.5;
-    rig.position = spawn + Vec3::new(0.0, 3.0, -6.0);
-    // Start looking into the resort (towards +Z).
+    rig.position = spawn + Vec3::new(0.0, 3.2, -6.0);
+    // Start looking north, into the resort.
     rig.yaw = 0.0;
     commands.insert_resource(rig);
+}
 
-    let _ = sky::camera_bundle;
-    let _ = materials.add(StandardMaterial::default());
+/// Keeps the player's fill light above them.
+pub fn follow_player_light(
+    players: Query<&Transform, With<PlayerAvatar>>,
+    mut lights: Query<&mut Transform, (With<PointLight>, Without<PlayerAvatar>)>,
+) {
+    let Ok(player) = players.single() else { return };
+    for mut light in &mut lights {
+        light.translation = player.translation + Vec3::Y * 2.6;
+    }
 }

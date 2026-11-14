@@ -37,18 +37,18 @@ jobs:
       - name: cargo check
         id: check
         continue-on-error: true
-        run: cargo check --all-targets --message-format=short > >(tee check.log) 2>&1
+        run: cargo check --all-targets --profile ci --message-format=short > >(tee check.log) 2>&1
 
       - name: cargo clippy
         id: clippy
         continue-on-error: true
-        run: cargo clippy --all-targets --message-format=short -- -D warnings > >(tee clippy.log) 2>&1
+        run: cargo clippy --all-targets --profile ci --message-format=short -- -D warnings > >(tee clippy.log) 2>&1
 
       - name: cargo test
         id: test
         continue-on-error: true
         timeout-minutes: 30
-        run: cargo test --all-targets --message-format=short > >(tee test.log) 2>&1
+        run: cargo test --all-targets --profile ci --message-format=short > >(tee test.log) 2>&1
 
       - name: Publish logs to CI logs branch
         if: always()
