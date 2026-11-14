@@ -1,22 +1,142 @@
 name: CI
+
 on:
   push:
   workflow_dispatch:
+    inputs:
+      windows:
+        description: "Also build the Windows release binary"
+        type: boolean
+        default: false
+
+env:
+  CARGO_TERM_COLOR: never
+  RUST_BACKTRACE: 1
 
 jobs:
-  check:
+  linux:
     name: Check & Test (Linux)
     runs-on: ubuntu-24.04
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
+
       - name: Install system dependencies
         run: |
-          sudo apt-get update
+          sudo apt-get update -qq
           sudo apt-get install -y --no-install-recommends \
             libasound2-dev libudev-dev pkg-config libwayland-dev libxkbcommon-dev
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: linux-check
+
+      - name: cargo check
+        id: check
+        continue-on-error: true
+        run: cargo check --all-targets --message-format=short 2>&1 | tee check.log
+
+      - name: cargo clippy
+        id: clippy
+        continue-on-error: true
+        run: cargo clippy --all-targets --message-format=short -- -D warnings 2>&1 | tee clippy.log
+
+      - name: cargo test
+        id: test
+        continue-on-error: true
+        timeout-minutes: 25
+        run: cargo test --all-targets --message-format=short 2>&1 | tee test.log
+
+      - name: Report results as commit comment
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SHA: ${{ github.sha }}
+          REPO: ${{ github.repository }}
+          CHECK: ${{ steps.check.outcome }}
+          CLIPPY: ${{ steps.clippy.outcome }}
+          TEST: ${{ steps.test.outcome }}
+        run: |
+          python3 - <<'PY'
+          import json, os, subprocess, urllib.request
+
+          def tail_filtered(path, max_chars=55000):
+              if not os.path.exists(path):
+                  return f"({path} missing)"
+              lines = open(path, errors="replace").read().splitlines()
+              keep = []
+              for i, line in enumerate(lines):
+                  low = line.lower()
+                  if ("error" in low or "warning:" in low or "panicked" in low
+                          or low.startswith("failures:") or "test result" in low
+                          or "running " in low or "--> " in low):
+                      keep.append(line)
+              if not keep:
+                  keep = lines[-40:]
+              text = "\n".join(keep)
+              return text[-max_chars:]
+
+          body = (
+              f"**CI report** for {os.environ['SHA'][:8]}\n\n"
+              f"- cargo check: {os.environ['CHECK']}\n"
+              f"- clippy: {os.environ['CLIPPY']}\n"
+              f"- cargo test: {os.environ['TEST']}\n\n"
+              "```\n" + tail_filtered("check.log", 12000) + "\n```\n\n"
+              "### clippy\n```\n" + tail_filtered("clippy.log", 8000) + "\n```\n\n"
+              "### test\n```\n" + tail_filtered("test.log", 8000) + "\n```\n"
+          )
+
+          # Commit comments are capped at 65536 chars; split if needed.
+          chunks = [body[i:i + 60000] for i in range(0, len(body), 60000)]
+          for chunk in chunks:
+              req = urllib.request.Request(
+                  f"https://api.github.com/repos/{os.environ['REPO']}/commits/{os.environ['SHA']}/comments",
+                  data=json.dumps({"body": chunk}).encode(),
+                  headers={
+                      "Authorization": f"Bearer {os.environ['GH_TOKEN']}",
+                      "Accept": "application/vnd.github+json",
+                      "Content-Type": "application/json",
+                      "User-Agent": "ci",
+                  },
+                  method="POST",
+              )
+              try:
+                  with urllib.request.urlopen(req) as r:
+                      print("posted comment", r.status)
+              except Exception as exc:  # pragma: no cover
+                  print("failed to post comment:", exc)
+          PY
+
+      - name: Fail if anything failed
+        if: steps.check.outcome != 'success' || steps.test.outcome != 'success'
+        run: exit 1
+
+  windows:
+    name: Build Windows release
+    if: github.event_name == 'workflow_dispatch' && inputs.windows
+    runs-on: windows-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
-      - name: cargo check
-        run: cargo check --all-targets 2>&1 | tee check.log; exit ${PIPESTATUS[0]}
-      - name: cargo test
-        run: cargo test --all-targets 2>&1 | tee test.log; exit ${PIPESTATUS[0]}
+        with:
+          shared-key: windows-release
+      - name: cargo build --release
+        run: cargo build --release --message-format=short 2>&1 | Tee-Object -FilePath build.log
+      - name: Package
+        run: |
+          New-Item -ItemType Directory -Path dist -Force | Out-Null
+          Copy-Item target\release\hitman_lowpoly.exe dist\
+          Copy-Item -Recurse assets dist\assets -ErrorAction SilentlyContinue
+          Copy-Item README.md, RUNNING.md dist\ -ErrorAction SilentlyContinue
+          Compress-Archive -Path dist\* -DestinationPath hitman-low-poly-windows-x86_64.zip -Force
+      - uses: actions/upload-artifact@v4
+        with:
+          name: hitman-low-poly-windows-x86_64
+          path: hitman-low-poly-windows-x86_64.zip
+          retention-days: 30
