@@ -19,6 +19,8 @@ struct NpcSpec {
     role: NpcRole,
     zone: ZoneId,
     routine: Vec<(Vec3, f32, &'static str)>,
+    /// Preferred walking speed (currently informational: navigation derives
+    /// speed from the waypoint's dwell time).
     speed_hint: f32,
 }
 
@@ -181,12 +183,13 @@ pub fn spawn_npcs(
             .map(|(p, _, _)| *p)
             .unwrap_or(Vec3::new(0.0, 0.0, -20.0));
 
-        let brain = spec.into_brain();
         let identity = NpcIdentity {
             name: spec.name,
             role: spec.role,
             zone: spec.zone,
         };
+        let speed_hint = spec.speed_hint;
+        let brain = spec.into_brain();
 
         let npc = commands
             .spawn((
@@ -207,7 +210,6 @@ pub fn spawn_npcs(
             ))
             .id();
 
-        let _ = spec.speed_hint;
         spawn_humanoid(
             &mut commands,
             npc,

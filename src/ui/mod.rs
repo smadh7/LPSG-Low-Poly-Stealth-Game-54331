@@ -4,7 +4,7 @@ pub mod hud;
 pub mod menu;
 
 use crate::{AppState, PauseState};
-use bevy::prelude::*;
+use bevy::{prelude::*, window::CursorGrabMode};
 
 pub struct UiPlugin;
 
@@ -15,7 +15,9 @@ impl Plugin for UiPlugin {
             .add_systems(
                 Update,
                 (
-                    hud::update_hud.run_if(in_state(AppState::Playing)),
+                    hud::update_hud_status.run_if(in_state(AppState::Playing)),
+                    hud::update_hud_detail.run_if(in_state(AppState::Playing)),
+                    hud::update_hud_notices.run_if(in_state(AppState::Playing)),
                     menu::menu_button_system,
                     menu::sync_settings_overlay,
                     toggle_pause,

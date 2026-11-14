@@ -47,6 +47,10 @@ pub struct Crosshair;
 #[derive(Component)]
 pub struct CompassText;
 
+/// One line of the scrolling notice feed.
+#[derive(Component)]
+pub struct NoticeLine;
+
 #[derive(Resource, Default)]
 pub struct HudCache {
     pub last_prompt: String,
@@ -213,6 +217,7 @@ pub fn spawn_hud(mut commands: Commands) {
                             ..default()
                         },
                         TextColor(Color::srgb(0.93, 0.92, 0.88)),
+                        NoticeLine,
                     ));
                 }
             });
@@ -283,79 +288,66 @@ pub fn spawn_hud(mut commands: Commands) {
 #[derive(Component)]
 pub struct OutfitText;
 
-/// Update every HUD element from gameplay state (only when it changes).
-pub fn update_hud(
-    time: Res<Time>,
+/// Update the left-hand HUD block: stance, zone and compass.
+pub fn update_hud_status(
     focus: Res<FocusTarget>,
-    feed: Res<NoticeFeed>,
-    player_state: Res<PlayerState>,
     rig: Res<CameraRig>,
     collision: Option<Res<WorldCollision>>,
     player: Query<(&Transform, &ActorBody), With<PlayerAvatar>>,
     mut cache: ResMut<HudCache>,
-    mut stance_text: Query<&mut Text, (With<StanceText>, Without<ZoneText>, Without<PromptText>, Without<PromptDetail>, Without<InventoryText>, Without<CompassText>, Without<OutfitText>)>,
-    mut zone_text: Query<&mut Text, (With<ZoneText>, Without<StanceText>, Without<PromptText>, Without<PromptDetail>, Without<InventoryText>, Without<CompassText>, Without<OutfitText>)>,
-    mut prompt_text: Query<&mut Text, (With<PromptText>, Without<StanceText>, Without<ZoneText>, Without<PromptDetail>, Without<InventoryText>, Without<CompassText>, Without<OutfitText>)>,
-    mut prompt_detail: Query<&mut Text, (With<PromptDetail>, Without<StanceText>, Without<ZoneText>, Without<PromptText>, Without<InventoryText>, Without<CompassText>, Without<OutfitText>)>,
-    mut inventory_text: Query<&mut Text, (With<InventoryText>, Without<StanceText>, Without<ZoneText>, Without<PromptText>, Without<PromptDetail>, Without<CompassText>, Without<OutfitText>)>,
-    mut compass_text: Query<&mut Text, (With<CompassText>, Without<StanceText>, Without<ZoneText>, Without<PromptText>, Without<PromptDetail>, Without<InventoryText>, Without<OutfitText>)>,
-    mut outfit_text: Query<&mut Text, (With<OutfitText>, Without<StanceText>, Without<ZoneText>, Without<PromptText>, Without<PromptDetail>, Without<InventoryText>, Without<CompassText>)>,
-    mut prompt_panel: Query<&mut Visibility, With<PromptPanel>>,
-    mut notice_children: Query<&mut Text, (With<ChildOf>, Without<StanceText>, Without<ZoneText>, Without<PromptText>, Without<PromptDetail>, Without<InventoryText>, Without<CompassText>, Without<OutfitText>)>,
-    notice_roots: Query<&Children, With<NoticeText>>,
+    mut texts: Query<(&mut Text, Option<&StanceText>, Option<&ZoneText>, Option<&CompassText>)>,
 ) {
-    let _ = time;
     let Ok((transform, body)) = player.single() else {
         return;
     };
 
-    // --- Stance --------------------------------------------------------
     let stance_label = match body.stance {
         Stance::Sprinting => "RUNNING",
         Stance::Crouching => "CROUCHED",
         Stance::Airborne => "AIRBORNE",
         Stance::Standing => "STANDING",
     };
-    if cache.last_stance != stance_label {
-        if let Ok(mut text) = stance_text.single_mut() {
-            **text = stance_label.to_string();
-        }
-        cache.last_stance = stance_label.to_string();
-    }
-
-    // --- Zone ----------------------------------------------------------
     let zone = collision
         .as_ref()
         .map(|c| c.zone_at(Vec2::new(transform.translation.x, transform.translation.z)))
         .unwrap_or(ZoneId::Gardens);
-    let zone_label = format!("{}  ({:.0} m)", zone.display_name(), transform.translation.y);
-    if cache.last_zone != zone_label {
-        if let Ok(mut text) = zone_text.single_mut() {
-            **text = zone_label.clone();
-        }
-        cache.last_zone = zone_label;
-    }
+    let zone_label = format!("{}  ·  {:.0} m", zone.display_name(), transform.translation.y);
 
-    // --- Compass -------------------------------------------------------
-    let heading = (rig.yaw.to_degrees().rem_euclid(360.0) + 360.0) % 360.0;
+    let heading = rig.yaw.to_degrees().rem_euclid(360.0);
     let directions = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"];
     let index = ((heading + 22.5) / 45.0).floor() as usize % 8;
-    let compass = format!("{}  {:03.0}°", directions[index], heading);
-    if cache.last_compass != compass {
-        if let Ok(mut text) = compass_text.single_mut() {
+    let compass = format!("{}   {:03.0} deg", directions[index], heading);
+
+    for (mut text, stance, zone, compass_marker) in &mut texts {
+        if stance.is_some() && cache.last_stance != stance_label {
+            **text = stance_label.to_string();
+            cache.last_stance = stance_label.to_string();
+        } else if zone.is_some() && cache.last_zone != zone_label {
+            **text = zone_label.clone();
+            cache.last_zone = zone_label.clone();
+        } else if compass_marker.is_some() && cache.last_compass != compass {
             **text = compass.clone();
-        }
-        cache.last_compass = compass;
-    }
-
-    // --- Outfit --------------------------------------------------------
-    if let Ok(mut text) = outfit_text.single_mut() {
-        let label = format!("Outfit: {}", player_state.outfit.display_name());
-        if text.0 != label {
-            **text = label;
+            cache.last_compass = compass.clone();
         }
     }
+    let _ = &focus;
+}
 
+/// Update the prompt panel, notice feed, inventory and outfit text.
+pub fn update_hud_detail(
+    focus: Res<FocusTarget>,
+    feed: Res<NoticeFeed>,
+    player_state: Res<PlayerState>,
+    mut cache: ResMut<HudCache>,
+    mut prompt_panel: Query<&mut Visibility, With<PromptPanel>>,
+    mut singles: Query<(
+        &mut Text,
+        Option<&PromptText>,
+        Option<&PromptDetail>,
+        Option<&InventoryText>,
+        Option<&OutfitText>,
+    )>,
+) {
     // --- Interaction prompt -------------------------------------------
     let has_focus = focus.entity.is_some();
     if let Ok(mut visibility) = prompt_panel.single_mut() {
@@ -368,45 +360,64 @@ pub fn update_hud(
             *visibility = wanted;
         }
     }
+
     if has_focus && cache.last_prompt != focus.prompt {
-        if let Ok(mut text) = prompt_text.single_mut() {
-            **text = if focus.exhausted {
-                format!("{}  (used)", focus.prompt)
-            } else {
-                focus.prompt.clone()
-            };
-        }
-        if let Ok(mut text) = prompt_detail.single_mut() {
-            **text = focus.description.clone();
-        }
         cache.last_prompt = focus.prompt.clone();
     }
 
-    // --- Notices -------------------------------------------------------
-    let notices: Vec<String> = feed.notices.iter().map(|n| n.text.clone()).collect();
-    let joined = notices.join("|");
-    if cache.last_notice != joined {
-        if let Ok(children) = notice_roots.single() {
-            for (i, child) in children.iter().enumerate() {
-                if let Ok(mut text) = notice_children.get_mut(child) {
-                    **text = notices.get(i).cloned().unwrap_or_default();
-                }
-            }
-        }
-        cache.last_notice = joined;
-    }
-
-    // --- Inventory -----------------------------------------------------
+    // --- Inventory + outfit + prompt text -----------------------------
     let inventory = if feed.inventory.is_empty() {
         "— empty —".to_string()
     } else {
         feed.inventory.join("\n")
     };
-    if cache.last_inventory != inventory {
-        if let Ok(mut text) = inventory_text.single_mut() {
-            **text = inventory.clone();
+    let outfit_label = format!("Outfit: {}", player_state.outfit.display_name());
+    for (mut text, prompt, detail, inventory_marker, outfit) in &mut singles {
+        if let Some(_prompt) = prompt {
+            let value = if focus.exhausted {
+                format!("{}  (used)", focus.prompt)
+            } else {
+                focus.prompt.clone()
+            };
+            if text.0 != value {
+                **text = value;
+            }
+        } else if detail.is_some() {
+            if text.0 != focus.description {
+                **text = focus.description.clone();
+            }
+        } else if inventory_marker.is_some() {
+            if cache.last_inventory != inventory {
+                **text = inventory.clone();
+            }
+        } else if outfit.is_some() {
+            if text.0 != outfit_label {
+                **text = outfit_label.clone();
+            }
         }
-        cache.last_inventory = inventory;
+    }
+    cache.last_inventory = inventory;
+}
+
+/// Push the notice feed into its four text lines.
+pub fn update_hud_notices(
+    feed: Res<NoticeFeed>,
+    mut cache: ResMut<HudCache>,
+    notice_roots: Query<&Children, (With<NoticeText>, Without<NoticeLine>)>,
+    mut lines: Query<&mut Text, With<NoticeLine>>,
+) {
+    let notices: Vec<String> = feed.notices.iter().map(|n| n.text.clone()).collect();
+    let joined = notices.join("|");
+    if cache.last_notice == joined {
+        return;
+    }
+    cache.last_notice = joined;
+    if let Ok(children) = notice_roots.single() {
+        for (index, child) in children.iter().enumerate() {
+            if let Ok(mut text) = lines.get_mut(child) {
+                **text = notices.get(index).cloned().unwrap_or_default();
+            }
+        }
     }
 }
 

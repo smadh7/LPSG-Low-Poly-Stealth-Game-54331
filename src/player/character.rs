@@ -156,17 +156,10 @@ pub fn spawn_humanoid(
         (meshes.hair.clone(), hair_mat, HumanoidRig::HEAD + Vec3::Y * 0.02, None),
         (meshes.leg.clone(), legs_mat.clone(), HumanoidRig::LEFT_LEG, Some(Limb::LeftLeg)),
         (meshes.leg.clone(), legs_mat.clone(), HumanoidRig::RIGHT_LEG, Some(Limb::RightLeg)),
-        (meshes.arm.clone(), torso_mat, HumanoidRig::LEFT_ARM, Some(Limb::LeftArm)),
+        (meshes.arm.clone(), torso_mat.clone(), HumanoidRig::LEFT_ARM, Some(Limb::LeftArm)),
         (meshes.arm.clone(), torso_mat, HumanoidRig::RIGHT_ARM, Some(Limb::RightArm)),
     ];
-    // Shoes are a small box at the foot of each leg; baked into the leg offset.
-    parts.push((
-        meshes.head.clone(),
-        shoes_mat,
-        Vec3::new(f32::MAX, 0.0, 0.0),
-        None,
-    ));
-    parts.pop();
+    let _ = shoes_mat; // shoes are baked into the leg mesh
 
     for (mesh, material, offset, limb) in parts {
         let mut entity = commands.spawn((

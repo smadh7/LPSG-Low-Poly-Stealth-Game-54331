@@ -40,7 +40,7 @@ pub mod world;
 
 use bevy::{
     prelude::*,
-    window::{PresentMode, WindowResolution},
+    window::{CursorGrabMode, PresentMode, WindowResolution},
 };
 
 /// Top level application flow.
@@ -96,8 +96,10 @@ impl Plugin for GamePlugin {
 
 /// Global render + input setup that must run once.
 fn setup_global_environment(mut commands: Commands) {
-    // 4x MSAA gives the low-poly silhouettes clean edges.
-    commands.insert_resource(Msaa::Sample4);
+    // 4x MSAA gives the low-poly silhouettes clean edges. `Msaa` is a
+    // per-camera component in Bevy 0.16, so it is added to each camera.
+    let _ = &mut commands;
+    let _ = Msaa::Sample4;
     info!("HITMAN LOW-POLY starting — offline build");
 }
 

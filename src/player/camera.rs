@@ -9,7 +9,7 @@ use super::character::{ActorBody, PlayerAvatar};
 use super::{Stance, CROUCH_EYE_HEIGHT, EYE_HEIGHT};
 use crate::core::math::{smooth_vec3, yaw_to_dir};
 use crate::world::builder::WorldCollision;
-use bevy::{input::mouse::AccumulatedMouseMotion, prelude::*};
+use bevy::{input::mouse::AccumulatedMouseMotion, prelude::*, window::CursorGrabMode};
 use std::f32::consts::{FRAC_PI_2, FRAC_PI_3};
 
 /// Physical camera entity.

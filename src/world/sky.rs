@@ -54,7 +54,13 @@ pub fn setup_lighting(
     });
 
     // Sky dome: a large inverted sphere with a simple two-tone look.
-    let sky_mesh = meshes.add(Mesh::from(Sphere::new(400.0).mesh().ico(2).unwrap_or_default()));
+    let sky_mesh = {
+        let sphere = Sphere::new(400.0);
+        match sphere.mesh().ico(2) {
+            Ok(mesh) => meshes.add(mesh),
+            Err(_) => meshes.add(Cuboid::new(800.0, 800.0, 800.0)),
+        }
+    };
     let sky_material = materials.add(StandardMaterial {
         base_color: Color::srgb(0.36, 0.58, 0.82),
         unlit: true,
