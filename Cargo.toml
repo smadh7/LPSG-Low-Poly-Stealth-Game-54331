@@ -34,19 +34,18 @@ bevy = { version = "0.16.1", default-features = false, features = [
 opt-level = 1
 debug = 0
 
-[profile.test]
-opt-level = 1
-debug = 0
-
 [profile.dev.package."*"]
 opt-level = 3
 
-# CI only: tests link quickly and nothing is optimised.
-[profile.ci]
-inherits = "dev"
+# CI only: link quickly, nothing optimised. The prebuilt `test` profile keeps
+# Bevy's own dependencies cached between runs.
+[profile.test]
 opt-level = 0
 debug = 0
 incremental = false
+
+[profile.ci]
+inherits = "test"
 
 [profile.release]
 lto = "thin"
