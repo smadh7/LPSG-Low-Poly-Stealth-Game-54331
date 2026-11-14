@@ -11,7 +11,7 @@ use hitman_lowpoly::interaction::{FocusTarget, InteractAction, InteractKind, Int
 use hitman_lowpoly::npc::brain::{Brain, BrainState};
 use hitman_lowpoly::npc::schedule::RoutineStep;
 use hitman_lowpoly::player::camera::CameraRig;
-use hitman_lowpoly::player::character::{ActorBody, PlayerAvatar};
+use hitman_lowpoly::player::character::{ActorBody, PlayerAvatar, PlayerVisual};
 use hitman_lowpoly::player::PlayerIntent;
 use hitman_lowpoly::player_state::PlayerState;
 use hitman_lowpoly::world::builder::WorldCollision;
@@ -19,35 +19,63 @@ use hitman_lowpoly::world::layout::resort_layout;
 
 /// Read the player's transform without keeping a world borrow alive.
 fn player_transform(app: &mut App) -> Vec3 {
-    let mut query = app
-        .world_mut()
-        .query_filtered::<&Transform, With<PlayerAvatar>>();
-    let transform = query.single(app.world()).expect("player exists");
+    let world = app.world();
+    let mut query = world.query_filtered::<&Transform, With<PlayerAvatar>>();
+    let transform = query.single(world).expect("player exists");
     transform.translation
 }
 
 /// Read the player's physics body state.
 fn player_body(app: &mut App) -> ActorBody {
-    let mut query = app.world_mut().query_filtered::<&ActorBody, With<PlayerAvatar>>();
-    query.single(app.world()).expect("player exists").clone()
+    let world = app.world();
+    let mut query = world.query_filtered::<&ActorBody, With<PlayerAvatar>>();
+    query.single(world).expect("player exists").clone()
 }
 
 /// Build a headless app with just the resources the physics needs.
+///
+/// The player's visual parts are included (invisibly, no meshes needed) so that
+/// the same code paths as the real game are exercised.
 fn physics_app(spawn: Vec3) -> App {
     let mut app = App::new();
     app.add_plugins(MinimalPlugins)
         .insert_resource(Time::<Fixed>::from_hz(60.0))
-        .insert_resource(PlayerIntent::default())
-        .insert_resource(CameraRig::default());
-
-    let layout = resort_layout();
-    app.insert_resource(WorldCollision::from_layout(&layout));
-    app.world_mut().spawn((
-        PlayerAvatar,
-        ActorBody::default(),
-        Transform::from_translation(spawn),
-    ));
+        .insert_resource(PendingPlayerSpawn { position: spawn });
+    app.add_systems(Startup, spawn_test_player);
+    app.update();
+    app.init_resource::<PlayerIntent>();
+    app.init_resource::<CameraRig>();
     app
+}
+
+#[derive(Resource, Clone, Copy)]
+struct PendingPlayerSpawn {
+    position: Vec3,
+}
+
+/// Startup system that mirrors `player::spawn::spawn_player` without visuals.
+fn spawn_test_player(mut commands: Commands, spawn: Res<PendingPlayerSpawn>) {
+    let layout = resort_layout();
+    commands.insert_resource(WorldCollision::from_layout(&layout));
+    let player = commands
+        .spawn((
+            PlayerAvatar,
+            ActorBody::default(),
+            Transform::from_translation(spawn.position),
+        ))
+        .id();
+    // A couple of inert body parts, as the real player has.
+    for offset in [Vec3::Y, Vec3::Y * 0.5] {
+        commands.spawn((
+            hitman_lowpoly::player::character::BodyPart {
+                owner: player,
+                offset,
+                limb: None,
+            },
+            PlayerVisual,
+            Transform::from_translation(spawn.position + offset),
+        ));
+    }
 }
 
 #[test]
