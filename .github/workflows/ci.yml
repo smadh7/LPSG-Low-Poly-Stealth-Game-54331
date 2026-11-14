@@ -45,6 +45,76 @@ jobs:
         continue-on-error: true
         run: cargo clippy --all-targets --message-format=short -- -D warnings 2>&1 | tee clippy.log
 
+      - name: Report check results immediately
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SHA: ${{ github.sha }}
+          REPO: ${{ github.repository }}
+          CHECK: ${{ steps.check.outcome }}
+          CLIPPY: ${{ steps.clippy.outcome }}
+        run: |
+          python3 - <<'PY'
+          import json, os, urllib.request
+
+          def tail_filtered(path, max_chars):
+              import os as _os
+              if not _os.path.exists(path):
+                  return f"({path} missing)"
+              lines = open(path, errors="replace").read().splitlines()
+              keep = [l for l in lines if ("error" in l.lower() or "warning:" in l
+                      or l.startswith("--> ") or "panicked" in l or "test result" in l
+                      or "running " in l or "FAILED" in l)]
+              return "\n".join(keep if keep else lines[-40:])[-max_chars:]
+
+          body = ("**Check report** " + os.environ["SHA"][:8] +
+                  "\n- cargo check: " + os.environ["CHECK"] +
+                  "\n- clippy: " + os.environ["CLIPPY"] + "\n\n```\n" +
+                  tail_filtered("check.log", 20000) + "\n```\n\n### clippy\n```\n" +
+                  tail_filtered("clippy.log", 12000) + "\n```\n")
+          req = urllib.request.Request(
+              "https://api.github.com/repos/" + os.environ["REPO"] + "/commits/" + os.environ["SHA"] + "/comments",
+              data=json.dumps({"body": body[:65000]}).encode(),
+              headers={"Authorization": "Bearer " + os.environ["GH_TOKEN"],
+                       "Accept": "application/vnd.github+json",
+                       "Content-Type": "application/json", "User-Agent": "ci"},
+              method="POST")
+          try:
+              with urllib.request.urlopen(req) as r:
+                  print("posted check report", r.status)
+          except Exception as e:
+              print("post failed", e)
+          PY
+
+      - name: Report test results
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SHA: ${{ github.sha }}
+          REPO: ${{ github.repository }}
+          TEST: ${{ steps.test.outcome }}
+        run: |
+          python3 - <<'PY'
+          import json, os, urllib.request
+          path = "test.log"
+          text = open(path, errors="replace").read() if os.path.exists(path) else "(no test log)"
+          lines = [l for l in text.splitlines() if ("test result" in l or "FAILED" in l or "panicked" in l)]
+          body = ("**Test report** " + os.environ["SHA"][:8] + " — " + os.environ["TEST"] +
+                  "\n```\n" + "\n".join(lines)[-20000:] + "\n```\n")
+          req = urllib.request.Request(
+              "https://api.github.com/repos/" + os.environ["REPO"] + "/commits/" + os.environ["SHA"] + "/comments",
+              data=json.dumps({"body": body[:65000]}).encode(),
+              headers={"Authorization": "Bearer " + os.environ["GH_TOKEN"],
+                       "Accept": "application/vnd.github+json",
+                       "Content-Type": "application/json", "User-Agent": "ci"},
+              method="POST")
+          try:
+              with urllib.request.urlopen(req) as r:
+                  print("posted test report", r.status)
+          except Exception as e:
+              print("post failed", e)
+          PY
+
       - name: cargo test
         id: test
         continue-on-error: true
