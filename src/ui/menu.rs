@@ -232,14 +232,8 @@ pub fn menu_button_system(
 }
 
 /// Resource tracking whether the settings overlay should be visible.
-#[derive(Resource, Debug)]
+#[derive(Resource, Debug, Default, Clone, Copy)]
 pub struct SettingsOpen(pub bool);
-
-impl Default for SettingsOpen {
-    fn default() -> Self {
-        Self(false)
-    }
-}
 
 /// Spawn the settings root when requested and nothing exists yet.
 pub fn sync_settings_overlay(

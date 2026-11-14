@@ -430,7 +430,9 @@ mod tests {
 
     #[test]
     fn focus_constants_are_reasonable() {
-        assert!(FOCUS_RANGE > 1.5);
-        assert!(FOCUS_CONE > 0.0 && FOCUS_CONE < 1.0);
+        let range = FOCUS_RANGE;
+        let cone = FOCUS_CONE;
+        assert!(range > 1.5);
+        assert!(cone > 0.0 && cone < 1.0);
     }
 }

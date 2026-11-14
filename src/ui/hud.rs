@@ -11,7 +11,24 @@ use crate::player::character::{ActorBody, PlayerAvatar};
 use crate::player::Stance;
 use crate::player_state::PlayerState;
 use crate::world::builder::WorldCollision;
-use bevy::prelude::*;
+use bevy::{ecs::query::QueryData, prelude::*};
+
+/// Optional markers for the left-hand status texts.
+#[derive(QueryData)]
+pub struct StatusTextParts {
+    pub stance: Option<StanceText>,
+    pub zone: Option<ZoneText>,
+    pub compass: Option<CompassText>,
+}
+
+/// Marker/flag bundle for the HUD texts that `update_hud_detail` updates.
+#[derive(QueryData)]
+pub struct HudTextParts {
+    pub prompt: Option<PromptText>,
+    pub detail: Option<PromptDetail>,
+    pub inventory: Option<InventoryText>,
+    pub outfit: Option<OutfitText>,
+}
 
 /// Root of all in-game HUD nodes.
 #[derive(Component)]
@@ -295,7 +312,7 @@ pub fn update_hud_status(
     collision: Option<Res<WorldCollision>>,
     player: Query<(&Transform, &ActorBody), With<PlayerAvatar>>,
     mut cache: ResMut<HudCache>,
-    mut texts: Query<(&mut Text, Option<&StanceText>, Option<&ZoneText>, Option<&CompassText>)>,
+    mut texts: Query<(&mut Text, StatusTextParts)>,
 ) {
     let Ok((transform, body)) = player.single() else {
         return;
@@ -318,7 +335,10 @@ pub fn update_hud_status(
     let index = ((heading + 22.5) / 45.0).floor() as usize % 8;
     let compass = format!("{}   {:03.0} deg", directions[index], heading);
 
-    for (mut text, stance, zone, compass_marker) in &mut texts {
+    for (mut text, parts) in &mut texts {
+        let stance = parts.stance;
+        let zone = parts.zone;
+        let compass_marker = parts.compass;
         if stance.is_some() && cache.last_stance != stance_label {
             **text = stance_label.to_string();
             cache.last_stance = stance_label.to_string();
@@ -340,13 +360,7 @@ pub fn update_hud_detail(
     player_state: Res<PlayerState>,
     mut cache: ResMut<HudCache>,
     mut prompt_panel: Query<&mut Visibility, With<PromptPanel>>,
-    mut singles: Query<(
-        &mut Text,
-        Option<&PromptText>,
-        Option<&PromptDetail>,
-        Option<&InventoryText>,
-        Option<&OutfitText>,
-    )>,
+    mut singles: Query<(HudTextParts, &mut Text)>,
 ) {
     // --- Interaction prompt -------------------------------------------
     let has_focus = focus.entity.is_some();
@@ -372,7 +386,11 @@ pub fn update_hud_detail(
         feed.inventory.join("\n")
     };
     let outfit_label = format!("Outfit: {}", player_state.outfit.display_name());
-    for (mut text, prompt, detail, inventory_marker, outfit) in &mut singles {
+    for (parts, mut text) in &mut singles {
+        let prompt = parts.prompt;
+        let detail = parts.detail;
+        let inventory_marker = parts.inventory;
+        let outfit = parts.outfit;
         if let Some(_prompt) = prompt {
             let value = if focus.exhausted {
                 format!("{}  (used)", focus.prompt)
@@ -382,18 +400,14 @@ pub fn update_hud_detail(
             if text.0 != value {
                 **text = value;
             }
-        } else if detail.is_some() {
-            if text.0 != focus.description {
-                **text = focus.description.clone();
-            }
+        } else if detail.is_some() && text.0 != focus.description {
+            **text = focus.description.clone();
         } else if inventory_marker.is_some() {
             if cache.last_inventory != inventory {
                 **text = inventory.clone();
             }
-        } else if outfit.is_some() {
-            if text.0 != outfit_label {
-                **text = outfit_label.clone();
-            }
+        } else if outfit.is_some() && text.0 != outfit_label {
+            **text = outfit_label.clone();
         }
     }
     cache.last_inventory = inventory;

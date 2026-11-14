@@ -190,8 +190,10 @@ mod tests {
 
     #[test]
     fn movement_basis_is_orthogonal() {
-        let mut rig = CameraRig::default();
-        rig.yaw = 1.234;
+        let rig = CameraRig {
+            yaw: 1.234,
+            ..CameraRig::default()
+        };
         let (f, r) = rig.movement_basis();
         assert!(f.dot(r).abs() < 1e-5);
         assert!((f.length() - 1.0).abs() < 1e-5);

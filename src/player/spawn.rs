@@ -100,11 +100,13 @@ pub fn spawn_player(
     ));
 
     // --- Camera rig resource --------------------------------------------
-    let mut rig = CameraRig::default();
-    rig.pivot = spawn + Vec3::Y * 1.5;
-    rig.position = spawn + Vec3::new(0.0, 3.2, -6.0);
     // Start looking north, into the resort.
-    rig.yaw = 0.0;
+    let rig = CameraRig {
+        yaw: 0.0,
+        pivot: spawn + Vec3::Y * 1.5,
+        position: spawn + Vec3::new(0.0, 3.2, -6.0),
+        ..CameraRig::default()
+    };
     commands.insert_resource(rig);
 }
 

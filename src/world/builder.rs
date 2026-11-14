@@ -228,10 +228,8 @@ impl WorldCollision {
     pub fn zone_at(&self, point: Vec2) -> ZoneId {
         let mut best: Option<(&ZoneDefinition, usize)> = None;
         for zone in &self.zones {
-            if zone.rect.contains(point) {
-                if best.map_or(true, |(_, prio)| zone.priority as usize >= prio) {
-                    best = Some((zone, zone.priority as usize));
-                }
+            if zone.rect.contains(point) && best.is_none_or(|(_, prio)| zone.priority as usize >= prio) {
+                best = Some((zone, zone.priority as usize));
             }
         }
         best.map(|(z, _)| z.id).unwrap_or(ZoneId::Beach)

@@ -15,7 +15,7 @@ use std::f32::consts::FRAC_PI_2;
 pub struct PlayerAvatar;
 
 /// Collision + kinematic state of an actor (player or NPC).
-#[derive(Component, Debug)]
+#[derive(Component, Debug, Clone)]
 pub struct ActorBody {
     pub radius: f32,
     pub height: f32,
@@ -237,20 +237,8 @@ pub fn sync_body_parts(
                     -0.55
                 }
             }
-            Some(Limb::Torso) => {
-                if body.stance == Stance::Sprinting {
-                    -0.12
-                } else {
-                    0.0
-                }
-            }
-            Some(Limb::Head) => {
-                if body.stance == Stance::Crouching {
-                    -0.16
-                } else {
-                    0.0
-                }
-            }
+            Some(Limb::Torso) => f32::from(body.stance == Stance::Sprinting) * -0.12,
+            Some(Limb::Head) => f32::from(body.stance == Stance::Crouching) * -0.16,
             None => 0.0,
         };
 
@@ -277,7 +265,10 @@ mod tests {
 
     #[test]
     fn humanoid_offsets_are_stacked() {
-        assert!(HumanoidRig::HEAD.y > HumanoidRig::TORSO.y);
-        assert!(HumanoidRig::LEFT_LEG.y < HumanoidRig::TORSO.y);
+        let head = HumanoidRig::HEAD.y;
+        let torso = HumanoidRig::TORSO.y;
+        let leg = HumanoidRig::LEFT_LEG.y;
+        assert!(head > torso);
+        assert!(leg < torso);
     }
 }

@@ -19,7 +19,7 @@ use hitman_lowpoly::world::layout::resort_layout;
 
 /// Read the player's transform without keeping a world borrow alive.
 fn player_transform(app: &mut App) -> Vec3 {
-    let world = app.world();
+    let world = app.world_mut();
     let mut query = world.query_filtered::<&Transform, With<PlayerAvatar>>();
     let transform = query.single(world).expect("player exists");
     transform.translation
@@ -27,7 +27,7 @@ fn player_transform(app: &mut App) -> Vec3 {
 
 /// Read the player's physics body state.
 fn player_body(app: &mut App) -> ActorBody {
-    let world = app.world();
+    let world = app.world_mut();
     let mut query = world.query_filtered::<&ActorBody, With<PlayerAvatar>>();
     query.single(world).expect("player exists").clone()
 }

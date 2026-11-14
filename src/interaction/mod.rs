@@ -134,6 +134,25 @@ pub struct FocusTarget {
 #[derive(Component)]
 pub struct InteractableVisual;
 
+/// Plugin wiring the interaction systems together.
+pub struct InteractionPlugin;
+
+impl Plugin for InteractionPlugin {
+    fn build(&self, app: &mut App) {
+        app.init_resource::<FocusTarget>()
+            .init_resource::<actions::NoticeFeed>()
+            .add_systems(Startup, prompts::spawn_interactables)
+            .add_systems(
+                Update,
+                (
+                    actions::tick_notices,
+                    prompts::update_focus,
+                    actions::handle_interaction.after(prompts::update_focus),
+                ),
+            );
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -164,21 +183,3 @@ mod tests {
     }
 }
 
-/// Plugin wiring the interaction systems together.
-pub struct InteractionPlugin;
-
-impl Plugin for InteractionPlugin {
-    fn build(&self, app: &mut App) {
-        app.init_resource::<FocusTarget>()
-            .init_resource::<actions::NoticeFeed>()
-            .add_systems(Startup, prompts::spawn_interactables)
-            .add_systems(
-                Update,
-                (
-                    actions::tick_notices,
-                    prompts::update_focus,
-                    actions::handle_interaction.after(prompts::update_focus),
-                ),
-            );
-    }
-}
