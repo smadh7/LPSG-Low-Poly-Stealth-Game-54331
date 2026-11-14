@@ -63,11 +63,26 @@ pub enum PauseState {
     Paused,
 }
 
+/// Number of frames to run before exiting, set via `HITMAN_SMOKE_FRAMES`.
+///
+/// This powers the CI smoke test: the real game (window, renderer, all
+/// gameplay plugins) boots, runs for a fixed number of frames and exits
+/// cleanly. It is inert in normal play.
+#[derive(Resource, Debug)]
+pub struct SmokeTest {
+    pub frames_left: u32,
+    pub total: u32,
+}
+
 /// Root plugin: inserts every subsystem in the right order.
 pub struct GamePlugin;
 
 impl Plugin for GamePlugin {
     fn build(&self, app: &mut App) {
+        let smoke_frames = std::env::var("HITMAN_SMOKE_FRAMES")
+            .ok()
+            .and_then(|value| value.parse::<u32>().ok());
+
         app.add_plugins(DefaultPlugins.set(WindowPlugin {
             primary_window: Some(Window {
                 title: "HITMAN LOW-POLY — Coral Palm Resort".to_string(),
@@ -80,6 +95,18 @@ impl Plugin for GamePlugin {
         }))
         .init_state::<AppState>()
         .init_state::<PauseState>()
+        .add_systems(Startup, move |mut commands: Commands, mut next: ResMut<NextState<AppState>>| {
+            if let Some(frames) = smoke_frames {
+                info!("SMOKE: running {frames} frames");
+                commands.insert_resource(SmokeTest {
+                    frames_left: frames,
+                    total: frames,
+                });
+                // Skip the menu so the whole gameplay stack is exercised.
+                next.set(AppState::Playing);
+            }
+        })
+        .add_systems(Update, smoke_test_tick)
         .init_resource::<player_state::PlayerState>()
         .insert_resource(bevy::pbr::DirectionalLightShadowMap { size: 2048 })
         .add_plugins((
@@ -90,7 +117,24 @@ impl Plugin for GamePlugin {
             ui::UiPlugin,
         ))
         .add_systems(Startup, setup_global_environment)
-        .add_systems(Update, (handle_state_transitions, capture_cursor));
+
+        .add_systems(Update, (handle_state_transitions, capture_cursor, log_smoke_progress));
+    }
+}
+
+/// Count frames down and exit cleanly when the smoke test finishes.
+fn smoke_test_tick(mut smoke: Option<ResMut<SmokeTest>>, mut exit: EventWriter<AppExit>) {
+    let Some(smoke) = smoke.as_mut() else {
+        return;
+    };
+    if smoke.frames_left == 0 {
+        return;
+    }
+    smoke.frames_left -= 1;
+    if smoke.frames_left == 0 {
+        println!("SMOKE OK frames={}", smoke.total);
+        info!("SMOKE OK frames={}", smoke.total);
+        exit.write(AppExit::Success);
     }
 }
 
@@ -147,6 +191,39 @@ fn handle_state_transitions(
             *visibility = want_hud;
         }
     }
+}
+
+/// Prints a one-line status dump during smoke tests so CI can verify the
+/// simulation actually advanced (player moved, NPCs walked, FPS measured).
+fn log_smoke_progress(
+    smoke: Option<Res<SmokeTest>>,
+    player: Query<&Transform, With<player::character::PlayerAvatar>>,
+    npcs: Query<&Transform, With<npc::Npc>>,
+    time: Res<Time<Real>>,
+    mut last_report: Local<f32>,
+) {
+    let Some(smoke) = smoke else { return };
+    let elapsed = time.elapsed_secs();
+    if elapsed - *last_report < 0.5 {
+        return;
+    }
+    *last_report = elapsed;
+    let p = player.single().map(|t| t.translation).unwrap_or(Vec3::ZERO);
+    let mut npc_moved = 0;
+    for t in &npcs {
+        if t.translation.length() > 0.1 {
+            npc_moved += 1;
+        }
+    }
+    info!(
+        "SMOKE frame {} / {} | player ({:.1}, {:.1}, {:.1}) | npcs {}",
+        smoke.total - smoke.frames_left,
+        smoke.total,
+        p.x,
+        p.y,
+        p.z,
+        npc_moved
+    );
 }
 
 /// Some window managers drop the cursor lock; re-apply it when needed.

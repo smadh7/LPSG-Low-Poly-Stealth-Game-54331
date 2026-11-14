@@ -610,7 +610,8 @@ pub fn resort_layout() -> ResortLayout {
             // The sea beyond the beach.
             Block2::new(Vec3::new(0.0, -1.0, -62.0), Vec3::new(160.0, 2.0, 10.0)),
         ],
-        player_spawn: Vec3::new(0.0, 0.1, -24.0),
+        // On the marble plaza just south of the lobby doors.
+        player_spawn: Vec3::new(0.0, 0.05, -17.5),
     }
 }
 
