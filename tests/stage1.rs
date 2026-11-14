@@ -116,7 +116,10 @@ fn player_walks_forward_and_is_blocked_by_walls() {
 
     let end = player_transform(&mut app);
 
-    assert!(end.z > start.z + 0.5, "player should have moved forward");
+    assert!(
+        end.z > start.z + 0.5,
+        "player should have moved forward: start={start:?} end={end:?}"
+    );
     // The lobby's south wall is at z = -14 with a 10 m wide doorway, and the
     // player is walking straight at the doorway, so they should end up inside
     // or in front of the building — never past the far wall.
@@ -152,8 +155,7 @@ fn player_can_climb_the_ramp_to_the_restaurant() {
     let transform = player_transform(&mut app);
     assert!(
         transform.y > 1.5,
-        "the player should climb onto the raised restaurant deck, y={}",
-        transform.y
+        "the player should climb onto the raised restaurant deck, pos={transform:?}"
     );
 }
 
