@@ -38,6 +38,9 @@ fn player_body(app: &mut App) -> ActorBody {
 /// directly makes the simulation deterministic and fast.
 fn step(app: &mut App, frames: usize) {
     for _ in 0..frames {
+        app.world_mut()
+            .resource_mut::<Time<Fixed>>()
+            .advance_by(std::time::Duration::from_secs_f64(1.0 / 60.0));
         app.world_mut().run_schedule(FixedUpdate);
     }
 }
@@ -50,7 +53,8 @@ fn physics_app(spawn: Vec3) -> App {
     let mut app = App::new();
     app.add_plugins(MinimalPlugins)
         .insert_resource(Time::<Fixed>::from_hz(60.0))
-        .insert_resource(PendingPlayerSpawn { position: spawn });
+        .insert_resource(PendingPlayerSpawn { position: spawn })
+        .insert_resource(Time::<Fixed>::from_hz(60.0));
     app.add_systems(Startup, spawn_test_player);
     app.update();
     app.init_resource::<PlayerIntent>();
@@ -261,7 +265,13 @@ fn every_interactable_sits_on_or_near_a_surface() {
     // Props must be reachable: each authored interactable has to sit on (or
     // just above) a walkable surface rather than floating in mid-air.
     let layout = resort_layout();
-    let blocks = layout.obstacle_blocks();
+    // Use every solid (including low furniture such as the reception desk,
+    // which is deliberately excluded from the walk-blocking collision set).
+    let blocks: Vec<hitman_lowpoly::core::Block2> = layout
+        .solids
+        .iter()
+        .map(|s| hitman_lowpoly::core::Block2::new(s.center, s.size))
+        .collect();
     let checks = [
         // (interactable position, description)
         (Vec3::new(-4.0, 1.35, 9.0), "guest register"),
