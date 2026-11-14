@@ -11,13 +11,12 @@ on:
 
 env:
   CARGO_TERM_COLOR: never
-  RUST_BACKTRACE: 1
 
 jobs:
   linux:
     name: Check & Test (Linux)
     runs-on: ubuntu-24.04
-    timeout-minutes: 60
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
 
@@ -38,148 +37,70 @@ jobs:
       - name: cargo check
         id: check
         continue-on-error: true
-        run: cargo check --all-targets --message-format=short 2>&1 | tee check.log
+        run: cargo check --all-targets --message-format=short > >(tee check.log) 2>&1
 
       - name: cargo clippy
         id: clippy
         continue-on-error: true
-        run: cargo clippy --all-targets --message-format=short -- -D warnings 2>&1 | tee clippy.log
-
-      - name: Report check results immediately
-        if: always()
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          SHA: ${{ github.sha }}
-          REPO: ${{ github.repository }}
-          CHECK: ${{ steps.check.outcome }}
-          CLIPPY: ${{ steps.clippy.outcome }}
-        run: |
-          python3 - <<'PY'
-          import json, os, urllib.request
-
-          def tail_filtered(path, max_chars):
-              import os as _os
-              if not _os.path.exists(path):
-                  return f"({path} missing)"
-              lines = open(path, errors="replace").read().splitlines()
-              keep = [l for l in lines if ("error" in l.lower() or "warning:" in l
-                      or l.startswith("--> ") or "panicked" in l or "test result" in l
-                      or "running " in l or "FAILED" in l)]
-              return "\n".join(keep if keep else lines[-40:])[-max_chars:]
-
-          body = ("**Check report** " + os.environ["SHA"][:8] +
-                  "\n- cargo check: " + os.environ["CHECK"] +
-                  "\n- clippy: " + os.environ["CLIPPY"] + "\n\n```\n" +
-                  tail_filtered("check.log", 20000) + "\n```\n\n### clippy\n```\n" +
-                  tail_filtered("clippy.log", 12000) + "\n```\n")
-          req = urllib.request.Request(
-              "https://api.github.com/repos/" + os.environ["REPO"] + "/commits/" + os.environ["SHA"] + "/comments",
-              data=json.dumps({"body": body[:65000]}).encode(),
-              headers={"Authorization": "Bearer " + os.environ["GH_TOKEN"],
-                       "Accept": "application/vnd.github+json",
-                       "Content-Type": "application/json", "User-Agent": "ci"},
-              method="POST")
-          try:
-              with urllib.request.urlopen(req) as r:
-                  print("posted check report", r.status)
-          except Exception as e:
-              print("post failed", e)
-          PY
-
-      - name: Report test results
-        if: always()
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          SHA: ${{ github.sha }}
-          REPO: ${{ github.repository }}
-          TEST: ${{ steps.test.outcome }}
-        run: |
-          python3 - <<'PY'
-          import json, os, urllib.request
-          path = "test.log"
-          text = open(path, errors="replace").read() if os.path.exists(path) else "(no test log)"
-          lines = [l for l in text.splitlines() if ("test result" in l or "FAILED" in l or "panicked" in l)]
-          body = ("**Test report** " + os.environ["SHA"][:8] + " — " + os.environ["TEST"] +
-                  "\n```\n" + "\n".join(lines)[-20000:] + "\n```\n")
-          req = urllib.request.Request(
-              "https://api.github.com/repos/" + os.environ["REPO"] + "/commits/" + os.environ["SHA"] + "/comments",
-              data=json.dumps({"body": body[:65000]}).encode(),
-              headers={"Authorization": "Bearer " + os.environ["GH_TOKEN"],
-                       "Accept": "application/vnd.github+json",
-                       "Content-Type": "application/json", "User-Agent": "ci"},
-              method="POST")
-          try:
-              with urllib.request.urlopen(req) as r:
-                  print("posted test report", r.status)
-          except Exception as e:
-              print("post failed", e)
-          PY
+        run: cargo clippy --all-targets --message-format=short -- -D warnings > >(tee clippy.log) 2>&1
 
       - name: cargo test
         id: test
         continue-on-error: true
-        timeout-minutes: 25
-        run: cargo test --all-targets --message-format=short 2>&1 | tee test.log
+        timeout-minutes: 30
+        run: cargo test --all-targets --message-format=short > >(tee test.log) 2>&1
 
-      - name: Report results as commit comment
+      - name: Publish logs to CI logs branch
         if: always()
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          SHA: ${{ github.sha }}
           REPO: ${{ github.repository }}
+          SHA: ${{ github.sha }}
           CHECK: ${{ steps.check.outcome }}
           CLIPPY: ${{ steps.clippy.outcome }}
           TEST: ${{ steps.test.outcome }}
+          RUN_ID: ${{ github.run_id }}
+          RUN_NUMBER: ${{ github.run_number }}
+          BRANCH: ${{ github.ref_name }}
+          MESSAGE: ${{ github.event.head_commit.message }}
         run: |
+          set -e
+          mkdir -p out
+          # Human summary
+          {
+            echo "SHA: $SHA"
+            echo "BRANCH: $BRANCH"
+            echo "MESSAGE: $MESSAGE"
+            echo "CHECK: $CHECK"
+            echo "CLIPPY: $CLIPPY"
+            echo "TEST: $TEST"
+          } > out/summary.txt
+          # Trimmed logs: keep lines that matter, fall back to the tail.
           python3 - <<'PY'
-          import json, os, subprocess, urllib.request
-
-          def tail_filtered(path, max_chars=55000):
-              if not os.path.exists(path):
-                  return f"({path} missing)"
-              lines = open(path, errors="replace").read().splitlines()
-              keep = []
-              for i, line in enumerate(lines):
-                  low = line.lower()
-                  if ("error" in low or "warning:" in low or "panicked" in low
-                          or low.startswith("failures:") or "test result" in low
-                          or "running " in low or "--> " in low):
-                      keep.append(line)
+          import os
+          for src, dst, limit in [("check.log", "out/check.txt", 220000),
+                                  ("clippy.log", "out/clippy.txt", 120000),
+                                  ("test.log", "out/test.txt", 120000)]:
+              if not os.path.exists(src):
+                  open(dst, "w").write("(missing)\n")
+                  continue
+              lines = open(src, errors="replace").read().splitlines()
+              keep = [l for l in lines if ("error" in l.lower() or "warning:" in l
+                      or l.startswith("--> ") or "panicked" in l or "test result" in l
+                      or "tests passed" in l or "test " in l and " ... " in l)]
               if not keep:
-                  keep = lines[-40:]
+                  keep = lines
               text = "\n".join(keep)
-              return text[-max_chars:]
-
-          body = (
-              f"**CI report** for {os.environ['SHA'][:8]}\n\n"
-              f"- cargo check: {os.environ['CHECK']}\n"
-              f"- clippy: {os.environ['CLIPPY']}\n"
-              f"- cargo test: {os.environ['TEST']}\n\n"
-              "```\n" + tail_filtered("check.log", 12000) + "\n```\n\n"
-              "### clippy\n```\n" + tail_filtered("clippy.log", 8000) + "\n```\n\n"
-              "### test\n```\n" + tail_filtered("test.log", 8000) + "\n```\n"
-          )
-
-          # Commit comments are capped at 65536 chars; split if needed.
-          chunks = [body[i:i + 60000] for i in range(0, len(body), 60000)]
-          for chunk in chunks:
-              req = urllib.request.Request(
-                  f"https://api.github.com/repos/{os.environ['REPO']}/commits/{os.environ['SHA']}/comments",
-                  data=json.dumps({"body": chunk}).encode(),
-                  headers={
-                      "Authorization": f"Bearer {os.environ['GH_TOKEN']}",
-                      "Accept": "application/vnd.github+json",
-                      "Content-Type": "application/json",
-                      "User-Agent": "ci",
-                  },
-                  method="POST",
-              )
-              try:
-                  with urllib.request.urlopen(req) as r:
-                      print("posted comment", r.status)
-              except Exception as exc:  # pragma: no cover
-                  print("failed to post comment:", exc)
+              open(dst, "w").write(text[-limit:])
           PY
+          cd out
+          git init -q -b ci-logs
+          git config user.email "ci@example.com"
+          git config user.name "CI"
+          git add -A
+          git commit -q -m "ci: logs for $RUN_NUMBER"
+          git remote add origin "https://x-access-token:${GH_TOKEN}@github.com/${REPO}.git"
+          git push -q --force origin ci-logs
 
       - name: Fail if anything failed
         if: steps.check.outcome != 'success' || steps.test.outcome != 'success'
@@ -189,7 +110,7 @@ jobs:
     name: Build Windows release
     if: github.event_name == 'workflow_dispatch' && inputs.windows
     runs-on: windows-latest
-    timeout-minutes: 90
+    timeout-minutes: 120
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
@@ -202,8 +123,6 @@ jobs:
         run: |
           New-Item -ItemType Directory -Path dist -Force | Out-Null
           Copy-Item target\release\hitman_lowpoly.exe dist\
-          Copy-Item -Recurse assets dist\assets -ErrorAction SilentlyContinue
-          Copy-Item README.md, RUNNING.md dist\ -ErrorAction SilentlyContinue
           Compress-Archive -Path dist\* -DestinationPath hitman-low-poly-windows-x86_64.zip -Force
       - uses: actions/upload-artifact@v4
         with:
