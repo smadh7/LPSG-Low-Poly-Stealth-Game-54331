@@ -190,14 +190,16 @@ jobs:
           sudo apt-get update -qq
           sudo apt-get install -y --no-install-recommends \
             libasound2-dev libudev-dev pkg-config libwayland-dev libxkbcommon-dev \
-            libxkbcommon0t64 libxkbcommon-x11-0t64 libxkbcommon-x11-0 libx11-xcb1 \
             mesa-vulkan-drivers libvulkan1 vulkan-tools libx11-dev libxi-dev \
             xvfb
           sudo apt-get install -y --no-install-recommends mesa-utils 2>/dev/null || true
-          # Ubuntu 24.04 renamed several packages for the time_t transition;
-          # accept either name and record what the loader can see.
-          sudo apt-get install -y --no-install-recommends \
-            libxkbcommon-x11-0t64 || sudo apt-get install -y --no-install-recommends libxkbcommon-x11-0 || true
+          # Ubuntu 24.04 renamed several packages for the time_t transition. A
+          # single apt-get line fails wholesale if any name is wrong, so each
+          # optional package is installed on its own and failures are tolerated.
+          for pkg in libxkbcommon-x11-0t64 libxkbcommon-x11-0 libxkbcommon0t64 \
+                     libx11-xcb1 libxcb1 libxcb-keysyms1; do
+            sudo apt-get install -y --no-install-recommends "$pkg" || true
+          done
           ldconfig -p | grep -i xkbcommon || true
           ls -l /usr/lib/x86_64-linux-gnu/libxkbcommon* || true
       - uses: dtolnay/rust-toolchain@stable
