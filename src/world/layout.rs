@@ -433,8 +433,8 @@ pub fn resort_layout() -> ResortLayout {
         let z0 = 28.0 + i as f32 * 0.28;
         b.slab(
             "Penthouse Stair",
-            Vec2::new(-32.0, z0),
-            Vec2::new(-29.0, z0 + 0.30),
+            Vec2::new(-32.0, z0 - 0.01),
+            Vec2::new(-29.0, z0 + 0.31),
             -0.2,
             top,
             STONE,

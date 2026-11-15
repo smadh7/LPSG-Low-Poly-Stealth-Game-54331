@@ -142,7 +142,8 @@ fn floor_at(collision: &WorldCollision, position: Vec3, radius: f32) -> Option<f
     let point = Vec2::new(position.x, position.z);
     let mut best: Option<f32> = None;
     for block in &collision.surfaces {
-        if !block.contains_xz(point, radius * 0.5) {
+        // Same "probe slightly wider than the body" rule as the player.
+        if !block.contains_xz(point, radius + 0.12) {
             continue;
         }
         let top = block.top();

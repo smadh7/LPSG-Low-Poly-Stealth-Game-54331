@@ -228,10 +228,14 @@ pub fn player_physics(
 
 /// Highest walkable surface below `point`, considering boxes whose top is no
 /// more than [`STEP_HEIGHT`] above `feet_y`.
+///
+/// The probe margin is slightly *larger* than the actor radius on purpose: an
+/// actor standing against a step is pushed a full radius away from it, so a
+/// smaller margin would never detect the step and the actor could never climb.
 pub fn ground_height(blocks: &[Block2], point: Vec2, radius: f32, feet_y: f32) -> Option<f32> {
     let mut best: Option<f32> = None;
     for block in blocks {
-        if !block.contains_xz(point, radius * 0.6) {
+        if !block.contains_xz(point, radius + 0.12) {
             continue;
         }
         let top = block.top();
