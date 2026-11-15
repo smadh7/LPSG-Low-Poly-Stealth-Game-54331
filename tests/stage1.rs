@@ -160,9 +160,9 @@ fn player_cannot_walk_through_a_solid_wall() {
 #[test]
 fn player_can_climb_the_ramp_to_the_restaurant() {
     // Start just south of the restaurant's outside stair and walk north.
-    let mut app = physics_app(Vec3::new(34.0, 0.0, -15.5));
+    let mut app = physics_app(Vec3::new(34.0, 0.0, -24.0));
     app.add_systems(FixedUpdate, hitman_lowpoly::player::movement::player_physics);
-    for _ in 0..400 {
+    for _ in 0..600 {
         app.world_mut().resource_mut::<PlayerIntent>().direction = Vec3::Z;
         step(&mut app, 1);
     }
@@ -170,6 +170,40 @@ fn player_can_climb_the_ramp_to_the_restaurant() {
     assert!(
         transform.y > 1.5,
         "the player should climb onto the raised restaurant deck, pos={transform:?}"
+    );
+}
+
+#[test]
+fn player_can_descend_into_the_service_corridor() {
+    // Walk south from the gardens onto the service staircase and down to the
+    // corridor floor (-3.4 m): this proves negative-height spaces are walkable.
+    let mut app = physics_app(Vec3::new(-33.0, 0.0, 18.0));
+    app.add_systems(FixedUpdate, hitman_lowpoly::player::movement::player_physics);
+    let mut lowest = f32::MAX;
+    for _ in 0..900 {
+        app.world_mut().resource_mut::<PlayerIntent>().direction = Vec3::Z;
+        step(&mut app, 1);
+        lowest = lowest.min(player_transform(&mut app).y);
+    }
+    assert!(
+        lowest < -3.0,
+        "player should reach the service corridor floor, lowest y={lowest}"
+    );
+}
+
+#[test]
+fn player_can_climb_the_penthouse_stair() {
+    // The restricted penthouse is 29.8 m up a 72-step staircase.
+    let mut app = physics_app(Vec3::new(-33.0, 0.0, 24.0));
+    app.add_systems(FixedUpdate, hitman_lowpoly::player::movement::player_physics);
+    for _ in 0..2400 {
+        app.world_mut().resource_mut::<PlayerIntent>().direction = Vec3::Z;
+        step(&mut app, 1);
+    }
+    let position = player_transform(&mut app);
+    assert!(
+        position.y > 25.0,
+        "player should climb towards the penthouse terrace, pos={position:?}"
     );
 }
 

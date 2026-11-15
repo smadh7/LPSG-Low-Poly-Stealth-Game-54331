@@ -377,15 +377,18 @@ pub fn resort_layout() -> ResortLayout {
             MARBLE,
         );
     }
-    // Stairs from the gardens up to the terrace (east side).
-    for i in 0..10 {
-        let z = -13.0 + i as f32 * 1.0;
+    // Staircase up the south face of the terrace: solid columns so every
+    // riser is only 0.24 m (well below the player's 0.62 m step height).
+    let rest_steps = 10;
+    for i in 0..rest_steps {
+        let top = (i as f32 + 1.0) * (rest / rest_steps as f32);
+        let z0 = -19.0 + i as f32 * 0.5;
         b.slab(
             "Restaurant Stair",
-            Vec2::new(33.0, z),
-            Vec2::new(35.0, z + 1.02),
-            -0.1,
-            (i as f32 + 1.0) * (rest / 10.0),
+            Vec2::new(33.0, z0),
+            Vec2::new(35.0, z0 + 0.52),
+            -0.2,
+            top,
             STONE,
         );
     }
@@ -421,21 +424,23 @@ pub fn resort_layout() -> ResortLayout {
     b.deco(DecoKind::PottedPlant, Vec3::new(-16.0, pent, 28.5), 0.0, 1.0);
     b.deco(DecoKind::PottedPlant, Vec3::new(16.0, pent, 28.5), 0.0, 1.0);
 
-    // External stair: 34 steps climbing from the gardens (z = 28) to the terrace.
-    let steps = 34;
-    for i in 0..steps {
-        let y = i as f32 * (pent / steps as f32);
-        let z = 28.0 + i as f32 * 0.6;
+    // External staircase: 72 solid columns with 0.41 m risers, climbing from
+    // the gardens (z = 28) up to the terrace landing (z = 48).
+    let stair_steps = 72;
+    let riser = pent / stair_steps as f32;
+    for i in 0..stair_steps {
+        let top = (i as f32 + 1.0) * riser;
+        let z0 = 28.0 + i as f32 * 0.28;
         b.slab(
             "Penthouse Stair",
-            Vec2::new(-32.0, z),
-            Vec2::new(-29.0, z + 0.62),
-            y,
-            y + 0.35,
+            Vec2::new(-32.0, z0),
+            Vec2::new(-29.0, z0 + 0.30),
+            -0.2,
+            top,
             STONE,
         );
     }
-    b.slab("Stair Landing", Vec2::new(-32.0, 48.0), Vec2::new(-18.0, 49.4), pent - 0.3, pent, STONE);
+    b.slab("Stair Landing", Vec2::new(-32.0, 48.2), Vec2::new(-18.0, 49.6), pent - 0.3, pent, STONE);
     // Security gate at the foot of the stairs (restricted access).
     b.slab("Stair Gate Post L", Vec2::new(-32.6, 27.2), Vec2::new(-31.6, 28.0), 0.0, 2.4, SECURITY);
     b.slab("Stair Gate Post R", Vec2::new(-29.4, 27.2), Vec2::new(-28.4, 28.0), 0.0, 2.4, SECURITY);
@@ -454,24 +459,21 @@ pub fn resort_layout() -> ResortLayout {
     if let Some(w) = b.solids.last_mut() {
         w.center.y += svc;
     }
-    b.wall("Service Wall N", Vec2::new(-48.0, 22.0), Vec2::new(-48.0 + 18.6, 22.6), 6.0, SERVICE);
-    if let Some(w) = b.solids.last_mut() {
-        w.center.y += svc;
-    }
     b.wall("Service Wall S", Vec2::new(-48.0, -30.6), Vec2::new(-29.4, -30.0), 6.0, SERVICE);
     if let Some(w) = b.solids.last_mut() {
         w.center.y += svc;
     }
-    // Ramp: 28 steps south from the gardens (x = -34) down into the corridor.
+    // Staircase down into the corridor from the gardens (north side): solid
+    // columns with 0.12 m risers so the descent is smooth.
     for i in 0..28 {
-        let y = -(i as f32 + 1.0) * (3.4 / 28.0);
-        let z = -30.4 + i as f32 * 0.55;
+        let top = -(i as f32 + 1.0) * (3.4 / 28.0);
+        let z0 = 22.4 - i as f32 * 0.55;
         b.slab(
             "Service Ramp",
-            Vec2::new(-35.0, z),
-            Vec2::new(-31.0, z + 0.57),
-            y,
-            y + 0.3,
+            Vec2::new(-35.0, z0 - 0.57),
+            Vec2::new(-31.0, z0),
+            svc,
+            top,
             STONE_DARK,
         );
     }
@@ -617,8 +619,13 @@ pub fn resort_layout() -> ResortLayout {
         ],
         // On the marble plaza just south of the lobby doors.
         floors: vec![
-            // Outdoor ground: gardens, plaza and beach (top at y = 0).
-            Block2::new(Vec3::new(0.0, -1.0, -6.0), Vec3::new(156.0, 2.0, 128.0)),
+            // Outdoor ground (top at y = 0) built as four plates around the
+            // below-ground service corridor + security wing (x -62.6..-29,
+            // z -31..22.6) so those spaces are actually open to the sky.
+            Block2::new(Vec3::new(24.5, -1.0, -6.0), Vec3::new(107.0, 2.0, 128.0)),
+            Block2::new(Vec3::new(-70.3, -1.0, -6.0), Vec3::new(15.4, 2.0, 128.0)),
+            Block2::new(Vec3::new(-45.8, -1.0, -50.5), Vec3::new(33.6, 2.0, 39.0)),
+            Block2::new(Vec3::new(-45.8, -1.0, 40.3), Vec3::new(33.6, 2.0, 35.4)),
             // Hotel interior ground floor.
             Block2::new(Vec3::new(0.0, -1.0, 6.0), Vec3::new(60.0, 2.0, 42.0)),
             // Staff room floor.
