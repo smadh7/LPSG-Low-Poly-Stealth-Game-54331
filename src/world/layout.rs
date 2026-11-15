@@ -477,9 +477,9 @@ mod tests {
             2.6,
             crate::world::mesh_kit::MatId::Plaster,
         );
-        assert!(!clear_at(&door.solids, 5.0, 1.2), "a doorway must be open");
-        assert!(!clear_at(&door.solids, 5.0, 0.2));
-        assert!(clear_at(&door.solids, 5.0, 3.2) || door.solids.iter().any(|s| s.center.y > 3.0));
+        assert!(clear_at(&door.solids, 5.0, 1.2), "a doorway must be walkable");
+        assert!(clear_at(&door.solids, 5.0, 0.2));
+        assert!(!clear_at(&door.solids, 5.0, 3.6), "the lintel must remain solid");
 
         // A window: 1.1 m sill, 2.9 m head, so the wall blocks at knee height
         // and keeps a lintel and sill.
@@ -498,5 +498,8 @@ mod tests {
         );
         assert!(!clear_at(&window.solids, 5.0, 0.5), "the sill must be solid");
         assert!(!clear_at(&window.solids, 5.0, 3.6), "the lintel must be solid");
+        // The glass itself occupies 1.1..2.9 m, so the wall is not see-through
+        // at head height either: the pane is a detail entity, not a hole.
+        assert!(clear_at(&window.solids, 5.0, 2.0), "the window aperture is open");
     }
 }

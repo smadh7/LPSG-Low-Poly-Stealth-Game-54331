@@ -486,11 +486,13 @@ pub fn build() -> ResortLayout {
     for i in 0..28 {
         let top = -(i as f32 + 1.0) * (3.4 / 28.0);
         let z0 = 22.4 - i as f32 * 0.55;
+        // The bottom extends below the corridor floor: a step whose top meets
+        // its own bottom would be degenerate geometry.
         b.slab(
             "Service Ramp",
             Vec2::new(-35.0, z0 - 0.57),
             Vec2::new(-31.0, z0),
-            svc,
+            svc - 0.5,
             top,
             MatId::Concrete,
         );

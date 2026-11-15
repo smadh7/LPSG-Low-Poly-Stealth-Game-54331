@@ -299,6 +299,8 @@ fn cube_direction(face: usize, u: f32, v: f32) -> Vec3 {
 /// Radiance of the sky for a view direction. Values are HDR (sun disk is very
 /// bright) so bloom and tonemapping behave like a real renderer.
 fn sample_sky(dir: Vec3, palette: &SkyPalette) -> Vec3 {
+    let sun_dir = SUN_DIRECTION.normalize();
+    let dir = dir.normalize_or_zero();
     let up = dir.y.max(-1.0);
     let horizon_t = (up.max(0.0)).powf(0.42);
     let mut color = palette.horizon.lerp(palette.zenith, horizon_t);
@@ -311,12 +313,12 @@ fn sample_sky(dir: Vec3, palette: &SkyPalette) -> Vec3 {
 
     // Forward scattering around the sun: the warm glow that makes a tropical
     // sky look photographed rather than painted.
-    let sun_dot = dir.dot(SUN_DIRECTION).max(0.0);
+    let sun_dot = dir.dot(sun_dir).max(0.0);
     let glow = sun_dot.powf(6.0) * 0.55 + sun_dot.powf(48.0) * 1.6;
     color += palette.haze * glow;
 
     // Sun disk, with a soft limb.
-    let disk = dir.dot(SUN_DIRECTION);
+    let disk = dir.dot(sun_dir);
     if disk > 0.99965 {
         color += palette.sun_color * 420.0;
     } else if disk > 0.9990 {
@@ -343,7 +345,7 @@ fn sample_sky(dir: Vec3, palette: &SkyPalette) -> Vec3 {
 
 /// Generate a 6-face HDR cubemap image of the sky.
 pub fn generate_environment_cubemap(size: u32, palette: &SkyPalette) -> Image {
-    let bytes_per_row = (size * 4 * 4) as usize; // RGBA16F
+    let bytes_per_row = (size * 4 * 2) as usize; // RGBA16F = 4 channels x 2 bytes
     let mut data = vec![0u8; bytes_per_row * size as usize * 6];
 
     for face in 0..6 {
