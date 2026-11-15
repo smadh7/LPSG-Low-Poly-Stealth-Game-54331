@@ -66,26 +66,5 @@ fn main() -> AppExit {
         );
     }
 
-    App::new()
-        .add_plugins(
-            DefaultPlugins
-                .set(AssetPlugin {
-                    // Paths inside the game are written as "textures/x.png", and
-                    // the base path above already points at the `assets` folder.
-                    file_path: String::new(),
-                    // A shipped game has no .meta files; never look for them.
-                    meta_check: bevy::asset::AssetMetaCheck::Never,
-                    ..default()
-                })
-                .set(WindowPlugin {
-                    primary_window: Some(Window {
-                        title: "HITMAN — Coral Palm Resort".into(),
-                        resolution: (1600.0, 900.0).into(),
-                        ..default()
-                    }),
-                    ..default()
-                }),
-        )
-        .add_plugins(GamePlugin)
-        .run()
+    App::new().add_plugins(GamePlugin).run()
 }

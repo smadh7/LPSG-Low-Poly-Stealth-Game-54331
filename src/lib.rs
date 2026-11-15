@@ -1,6 +1,6 @@
-//! # HITMAN LOW-POLY
+//! # HITMAN — Coral Palm Resort
 //!
-//! An original, offline, third-person low-poly stealth sandbox built with
+//! An original, offline, third-person stealth sandbox built with
 //! [Bevy](https://bevyengine.org) — inspired by the *structure* of modern
 //! stealth games (social stealth, disguises, restricted areas) but with its own
 //! setting, characters and map: the **Coral Palm Resort**.
@@ -83,7 +83,29 @@ impl Plugin for GamePlugin {
             .ok()
             .and_then(|value| value.parse::<u32>().ok());
 
-        app.add_plugins(DefaultPlugins)
+        app.add_plugins(
+            DefaultPlugins
+                .set(AssetPlugin {
+                    // Asset paths are written relative to the `assets` folder
+                    // ("textures/marble_basecolor.png"), so the folder itself is
+                    // the root. `main` points BEVY_ASSET_ROOT at the copy that
+                    // sits next to the executable, which is what makes the
+                    // shipped build portable.
+                    file_path: String::new(),
+                    // A shipped game has no .meta files; never look for them and
+                    // never fail a load because one is absent.
+                    meta_check: AssetMetaCheck::Never,
+                    ..default()
+                })
+                .set(WindowPlugin {
+                    primary_window: Some(Window {
+                        title: "HITMAN — Coral Palm Resort".to_string(),
+                        resolution: (1600.0, 900.0).into(),
+                        ..default()
+                    }),
+                    ..default()
+                }),
+        )
         .init_state::<AppState>()
         .init_state::<PauseState>()
         .add_systems(Startup, move |mut commands: Commands, mut next: ResMut<NextState<AppState>>| {
