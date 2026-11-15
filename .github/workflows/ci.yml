@@ -152,7 +152,7 @@ jobs:
           # The viewpoints that matter: exterior, lobby interior, gardens,
           # pool terrace, restaurant, a character close-up and an overview.
           export HITMAN_CAPTURE=\
-          "01_arrival:0,2.4,-40,0,3,-6;02_lobby:0,2.6,20,0,2.4,-4;03_gardens:-18,1.9,12,2,1.6,-12;04_pool:40,1.9,-12,30,0.8,-26;05_restaurant:46,3.7,8,34,2.2,-4;06_character:0.9,1.5,-1.0,0,1.45,-3.4;07_overview:6,16,-52,0,4,-4"
+          "01_arrival:0,2.4,-40,0,3,-6;02_lobby:0,2.6,20,0,2.4,-4;03_gardens:-18,1.9,12,2,1.6,-12;04_pool:40,1.9,-12,30,0.8,-26;05_restaurant:46,3.7,8,34,2.2,-4;06_character:0.9,1.5,-1.0,0,1.45,-3.4;07_overview:30,26,-70,0,6,-6"
           timeout 2400 xvfb-run -a -s "-screen 0 1600x900x24" \
             ./target/debug/hitman_lowpoly > shots/capture.log 2>&1 || true
           sed 's/\x1b\[[0-9;]*m//g' shots/capture.log | tail -25

@@ -66,28 +66,28 @@ pub const SUN_LUX: f32 = 82_000.0;
 /// and bloom thresholds all have to use the same units or they vanish.
 pub const SKY_RADIANCE: f32 = 9_000.0;
 
-/// Skybox brightness: converts the unit-range cubemap to cd/m².
+/// Skybox brightness.
 ///
-/// The tonemapper applies exposure to the whole HDR target, including the
-/// skybox, so the sky has to be in radiance units like everything else.
-pub const SKY_BRIGHTNESS: f32 = SKY_RADIANCE;
+/// Bevy's PBR shader pre-multiplies *lights* by `view.exposure`, so a sunlit
+/// surface lands around 1.0 in the HDR target. The skybox pass does **not**
+/// apply exposure, so its output must already be in that same 0..2 range.
+/// Writing raw radiance here (9,000 cd/m²) blew out the entire frame through
+/// bloom. This constant is therefore the exposed value of the sky, not its
+/// physical luminance.
+pub const SKY_BRIGHTNESS: f32 = 0.92;
 
-/// Haze colour for distance fog, in radiance (see [`SKY_RADIANCE`]).
+/// Haze colour for distance fog.
+///
+/// Like the skybox, Bevy mixes fog in *without* applying exposure, so this is in
+/// the exposed 0..2 range rather than radiance. It is deliberately a little
+/// cooler and darker than the sky so distant geometry keeps some separation.
 pub fn fog_color() -> Color {
-    Color::LinearRgba(LinearRgba::rgb(
-        0.55 * SKY_RADIANCE,
-        0.68 * SKY_RADIANCE,
-        0.85 * SKY_RADIANCE,
-    ))
+    Color::LinearRgba(LinearRgba::rgb(0.60, 0.72, 0.86))
 }
 
 /// Sunlit haze colour, used by fog's in-scattering term.
 pub fn fog_sun_color() -> Color {
-    Color::LinearRgba(LinearRgba::rgb(
-        1.10 * SKY_RADIANCE,
-        0.98 * SKY_RADIANCE,
-        0.80 * SKY_RADIANCE,
-    ))
+    Color::LinearRgba(LinearRgba::rgb(1.15, 1.02, 0.84))
 }
 
 /// Direction *towards* the sun. Shared by lighting, sky generation and any
@@ -650,10 +650,10 @@ pub fn apply_post_processing(
             // it; a threshold near 1.0 blooms every sunlit wall.
             camera.insert(Bloom {
                 prefilter: bevy::core_pipeline::bloom::BloomPrefilter {
-                    threshold: 1.6,
-                    threshold_softness: 0.5,
+                    threshold: 1.35,
+                    threshold_softness: 0.6,
                 },
-                intensity: 0.10,
+                intensity: 0.06,
                 ..Bloom::NATURAL
             });
         } else {
