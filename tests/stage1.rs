@@ -4,7 +4,7 @@
 //! minimal Bevy app so movement, collision, NPC routines and interaction are
 //! verified by machinery, not by eye.
 
-use bevy::{prelude::*, time::PhysicsSchedule};
+use bevy::prelude::*;
 use hitman_lowpoly::core::Circle2;
 use hitman_lowpoly::interaction::actions::NoticeFeed;
 use hitman_lowpoly::interaction::{FocusTarget, InteractAction, InteractKind, Interactable};
@@ -37,11 +37,15 @@ fn player_body(app: &mut App) -> ActorBody {
 /// The headless app does not advance real time, so driving `FixedUpdate`
 /// directly makes the simulation deterministic and fast.
 fn step(app: &mut App, frames: usize) {
-    // `PhysicsSchedule` is the schedule Bevy's `TimePlugin` runs once per fixed
-    // timestep; it advances `Time<Fixed>` and then runs `FixedUpdate`. Running
-    // it directly makes the simulation deterministic and instant.
+    // `app.update()` runs the fixed-timestep loop; with our fixed clock set to
+    // 1/60 s and real time advanced by the same amount, each call runs exactly
+    // one `FixedUpdate`, which keeps the simulation deterministic and fast.
+    let step = std::time::Duration::from_secs_f64(1.0 / 60.0);
     for _ in 0..frames {
-        app.world_mut().run_schedule(PhysicsSchedule);
+        app.world_mut()
+            .resource_mut::<Time<Virtual>>()
+            .advance_by(step);
+        app.update();
     }
 }
 
@@ -90,20 +94,6 @@ fn spawn_test_player(mut commands: Commands, spawn: Res<PendingPlayerSpawn>) {
             Transform::from_translation(spawn.position + offset),
         ));
     }
-}
-
-#[test]
-fn debug_physics_moves_at_all() {
-    let mut app = physics_app(Vec3::new(0.0, 0.0, -20.0));
-    app.add_systems(FixedUpdate, hitman_lowpoly::player::movement::player_physics);
-    println!("obstacles: {}", app.world().resource::<WorldCollision>().blocks.len());
-    for i in 0..3 {
-        app.world_mut().resource_mut::<PlayerIntent>().direction = Vec3::Z;
-        step(&mut app, 20);
-        let body = player_body(&mut app);
-        println!("step {i}: pos={:?} vel={:?} grounded={}", player_transform(&mut app), body.velocity, body.grounded);
-    }
-    panic!("debug output above");
 }
 
 #[test]
