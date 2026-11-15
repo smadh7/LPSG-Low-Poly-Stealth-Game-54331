@@ -116,9 +116,9 @@ fn player_stands_on_the_floor_and_does_not_sink() {
 
 #[test]
 fn player_walks_forward_and_is_blocked_by_walls() {
-    let mut app = physics_app(Vec3::new(0.0, 0.0, -20.0));
+    // Open marble plaza in front of the lobby, clear of the garden hedges.
+    let mut app = physics_app(Vec3::new(0.0, 0.0, -17.5));
     app.add_systems(FixedUpdate, hitman_lowpoly::player::movement::player_physics);
-    app.world_mut().resource_mut::<PlayerIntent>().direction = Vec3::Z;
 
     let start = player_transform(&mut app);
 
@@ -131,8 +131,8 @@ fn player_walks_forward_and_is_blocked_by_walls() {
     let end = player_transform(&mut app);
 
     assert!(
-        end.z > start.z + 0.5,
-        "player should have moved forward: start={start:?} end={end:?}"
+        end.z > start.z + 3.0,
+        "player should walk forward into the lobby: start={start:?} end={end:?}"
     );
     // The lobby's south wall is at z = -14 with a 10 m wide doorway, and the
     // player is walking straight at the doorway, so they should end up inside

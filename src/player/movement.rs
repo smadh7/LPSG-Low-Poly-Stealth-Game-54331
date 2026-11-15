@@ -207,14 +207,10 @@ pub fn player_physics(
         transform.rotation = Quat::from_rotation_y(current_yaw + turn);
     }
 
-    // Smoothly lower the model when crouching.
-    let target_offset = if crouched { -0.32 } else { 0.0 };
-    let current_offset = transform.translation.y - position.y;
-    let blended = approach_f32(current_offset, target_offset, 3.0, dt);
-    transform.translation = position + Vec3::Y * blended + Vec3::Y * 0.0;
-    transform.translation.x = position.x;
-    transform.translation.z = position.z;
-    transform.translation.y = position.y + blended;
+    // The transform *is* the physical state: never fold a visual offset into
+    // it, or the solver loses track of the floor height. Crouching lowers the
+    // body parts instead (see `character::sync_body_parts`).
+    transform.translation = position;
 
     // --- Stance + animation phase --------------------------------------
     body.stance = if !body.grounded {
