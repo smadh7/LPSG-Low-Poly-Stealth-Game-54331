@@ -38,10 +38,7 @@ pub mod player_state;
 pub mod ui;
 pub mod world;
 
-use bevy::{
-    prelude::*,
-    window::{CursorGrabMode, PresentMode, WindowResolution},
-};
+use bevy::{prelude::*, window::CursorGrabMode};
 
 use bevy::render::view::screenshot::{save_to_disk, Screenshot};
 use player::character;
@@ -86,20 +83,11 @@ impl Plugin for GamePlugin {
             .ok()
             .and_then(|value| value.parse::<u32>().ok());
 
-        app.add_plugins(DefaultPlugins.set(WindowPlugin {
-            primary_window: Some(Window {
-                title: "HITMAN LOW-POLY — Coral Palm Resort".to_string(),
-                resolution: WindowResolution::new(1600.0, 900.0),
-                present_mode: PresentMode::AutoVsync,
-                resizable: true,
-                ..default()
-            }),
-            ..default()
-        }))
+        app.add_plugins(DefaultPlugins)
         .init_state::<AppState>()
         .init_state::<PauseState>()
         .add_systems(Startup, move |mut commands: Commands, mut next: ResMut<NextState<AppState>>| {
-            if let Some(frames) = smoke_frames {
+            if let Some(frames) = smoke_frames.filter(|f| *f > 0) {
                 info!("SMOKE: running {frames} frames");
                 commands.insert_resource(SmokeTest {
                     frames_left: frames,

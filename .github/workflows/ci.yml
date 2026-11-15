@@ -126,7 +126,7 @@ jobs:
         if: always()
         timeout-minutes: 30
         env:
-          HITMAN_SMOKE_FRAMES: "0"
+          HITMAN_ASSET_ROOT: ${{ github.workspace }}/assets
         run: |
           set -x
           # A handful of viewpoints used to verify the level visually. Each run
@@ -188,6 +188,7 @@ jobs:
           sudo apt-get update -qq
           sudo apt-get install -y --no-install-recommends \
             libasound2-dev libudev-dev pkg-config libwayland-dev libxkbcommon-dev \
+            libxkbcommon-x11-0 libx11-xcb1 \
             mesa-vulkan-drivers libvulkan1 vulkan-tools libx11-dev libxi-dev \
             xvfb
           sudo apt-get install -y --no-install-recommends mesa-utils 2>/dev/null || true
