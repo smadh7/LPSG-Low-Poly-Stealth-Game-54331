@@ -94,7 +94,7 @@ impl Plugin for GamePlugin {
                     file_path: String::new(),
                     // A shipped game has no .meta files; never look for them and
                     // never fail a load because one is absent.
-                    meta_check: AssetMetaCheck::Never,
+                    meta_check: bevy::asset::AssetMetaCheck::Never,
                     ..default()
                 })
                 .set(WindowPlugin {
