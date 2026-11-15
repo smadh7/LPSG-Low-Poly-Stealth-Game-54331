@@ -200,6 +200,22 @@ jobs:
                      libx11-xcb1 libxcb1 libxcb-keysyms1; do
             sudo apt-get install -y --no-install-recommends "$pkg" || true
           done
+          # If apt cannot supply it, take the .deb straight from the Ubuntu
+          # archive and unpack it into /usr/lib (no dependency solving needed:
+          # it only requires libxkbcommon0, which is already present).
+          if ! ldconfig -p | grep -q libxkbcommon-x11; then
+            cd /tmp
+            for url in \
+              http://archive.ubuntu.com/ubuntu/pool/main/libx/libxkbcommon/libxkbcommon-x11-0_1.6.0-1build1_amd64.deb \
+              http://archive.ubuntu.com/ubuntu/pool/main/libx/libxkbcommon/libxkbcommon-x11-0_1.5.0-1_amd64.deb \
+              http://archive.ubuntu.com/ubuntu/pool/main/libx/libxkbcommon/libxkbcommon-x11-0_1.4.1-1_amd64.deb; do
+              if curl -fsSLO "$url"; then dpkg-deb -x "$(basename "$url")" /tmp/xkbextract || true; fi
+            done
+            sudo cp -av /tmp/xkbextract/usr/lib/x86_64-linux-gnu/libxkbcommon-x11.so* /usr/lib/x86_64-linux-gnu/ 2>/dev/null || true
+            sudo ldconfig || true
+          fi
+          echo "--- xkbcommon libraries visible to the loader:"
+          ldconfig -p | grep -i xkbcommon || echo "NONE FOUND"
           ldconfig -p | grep -i xkbcommon || true
           ls -l /usr/lib/x86_64-linux-gnu/libxkbcommon* || true
       - uses: dtolnay/rust-toolchain@stable
