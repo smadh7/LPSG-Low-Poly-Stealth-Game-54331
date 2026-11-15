@@ -124,8 +124,26 @@ the only asset Bevy loads is its built-in default font (compiled into the binary
 
 ### Verification note
 
-Every claim above is backed by a test in `cargo test` or reproducible by playing:
-`cargo test` runs the headless simulation of the real movement system.
+Every claim above is backed by a test in `cargo test` or reproducible by playing.
+`cargo test` runs the real movement system headlessly, driving the actual
+`player_physics` fixed-update system: walking, running, crouching, jumping,
+wall blocking, and full ascents of all three staircases (restaurant deck +2.4 m,
+penthouse terrace +29.8 m, service corridor −3.4 m).
+
+Current CI status on this branch — all green:
+
+| Check | Result |
+| --- | --- |
+| `cargo check --all-targets` | pass |
+| `cargo clippy --all-targets -- -D warnings` | pass |
+| Unit tests (library) | 32 passed |
+| Stage 1 integration tests | 13 passed |
+| Headless smoke test (real binary, Vulkan) | pass — boots, loads the 165-solid map, runs 300 frames with 14 NPCs, exits 0 |
+
+The smoke job launches the actual game executable under `xvfb` with a software
+Vulkan renderer (`HITMAN_SMOKE_FRAMES=300`), so window creation, asset setup,
+map construction, NPC spawning and the render loop are all exercised, not just
+the logic.
 
 ---
 
