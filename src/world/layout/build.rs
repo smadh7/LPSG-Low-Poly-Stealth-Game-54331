@@ -7,7 +7,10 @@
 //! and beach gardens to the south, service and security levels underground, and
 //! the owner's penthouse on the roof.
 
-use super::{palette::*, DecoKind, DoorSpec, LayoutBuilder, ResortLayout};
+use super::{
+    palette::*, DecoKind, DoorSpec, LayoutBuilder, ResortLayout, LOBBY_CEILING, SERVICE_Y,
+    UPPER_CEILING,
+};
 use crate::core::ZoneId::*;
 use crate::world::mesh_kit::MatId;
 use bevy::prelude::*;
@@ -334,7 +337,6 @@ pub fn build() -> ResortLayout {
     b.slab("Garden Path Beach", Vec2::new(-2.6, -40.0), Vec2::new(2.6, -34.0), 0.0, 0.08, MatId::Terracotta);
 
     // Formal hedge parterres flanking the axis (they double as cover).
-    let mut hedge_id = 0;
     for (mx, mz, sx, sz) in [
         (-16.0_f32, -18.0_f32, 12.0_f32, 1.2_f32),
         (16.0, -18.0, 12.0, 1.2),
@@ -343,17 +345,24 @@ pub fn build() -> ResortLayout {
         (-10.0, -38.0, 8.0, 1.2),
         (10.0, -38.0, 8.0, 1.2),
     ] {
-        hedge_id += 1;
-        b.slab(
-            "Garden Hedge",
-            Vec2::new(mx - sx * 0.5, mz - sz * 0.5),
-            Vec2::new(mx + sx * 0.5, mz + sz * 0.5),
-            0.0,
-            1.5,
+        b.hedge(Vec2::new(mx, mz), Vec2::new(sx, sz), 1.5);
+    }
+    // Rounded hedge caps: a slightly wider leafy crown breaks the box edge.
+    for (mx, mz, sx, sz) in [
+        (-16.0_f32, -18.0_f32, 12.0_f32, 1.2_f32),
+        (16.0, -18.0, 12.0, 1.2),
+        (-16.0, -30.0, 1.2, 10.0),
+        (16.0, -30.0, 1.2, 10.0),
+        (-10.0, -38.0, 8.0, 1.2),
+        (10.0, -38.0, 8.0, 1.2),
+    ] {
+        b.detail(
+            Vec3::new(mx, 1.52, mz),
+            Vec3::new(sx * 0.96, 0.22, sz * 0.96),
             MatId::Hedge,
         );
-        let _ = hedge_id;
     }
+
     // Flower beds inside the parterres.
     for (x, z) in [(-16.0_f32, -22.0_f32), (16.0, -22.0), (-10.0, -42.0), (10.0, -42.0)] {
         b.deco(DecoKind::FlowerBed, Vec3::new(x, 0.0, z), 0.0, 1.0);

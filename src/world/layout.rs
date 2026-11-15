@@ -331,7 +331,7 @@ impl LayoutBuilder {
             (a.y.min(b.y), a.y.max(b.y), (a.x + b.x) * 0.5)
         };
         let half = thickness * 0.5;
-        let piece = |name: &'static str, from: f32, to: f32, bottom: f32, top: f32| {
+        let mut piece = |name: &'static str, from: f32, to: f32, bottom: f32, top: f32| {
             if to - from <= 0.001 || top - bottom <= 0.001 {
                 return;
             }
@@ -365,6 +365,19 @@ impl LayoutBuilder {
         });
     }
 
+    /// A hedge block: solid (it blocks movement and is real cover) and drawn
+    /// with the foliage material.
+    pub fn hedge(&mut self, center: Vec2, size: Vec2, height: f32) {
+        self.slab(
+            "Garden Hedge",
+            center - size * 0.5,
+            center + size * 0.5,
+            0.0,
+            height,
+            crate::world::mesh_kit::MatId::Hedge,
+        );
+    }
+
     pub fn deco(&mut self, kind: DecoKind, position: Vec3, yaw: f32, scale: f32) {
         self.deco.push(DecoSpec {
             kind,
@@ -385,7 +398,7 @@ impl LayoutBuilder {
 /// (−Z), the hotel in the middle, the gardens between them, the service level
 /// under the west gardens, and the penthouse on the hotel roof.
 pub fn resort_layout() -> ResortLayout {
-    layout::build()
+    build::build()
 }
 
 pub mod build;

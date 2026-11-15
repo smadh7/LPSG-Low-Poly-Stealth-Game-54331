@@ -27,7 +27,7 @@ use bevy::{
         tonemapping::Tonemapping,
     },
     image::{ImageAddressMode, ImageFilterMode, ImageSampler, ImageSamplerDescriptor},
-    pbr::{CascadeShadowConfigBuilder, DirectionalLightShadowMap, EnvironmentMapLight},
+    pbr::{CascadeShadowConfigBuilder, CascadeShadowConfig, DirectionalLightShadowMap, EnvironmentMapLight},
     prelude::*,
     render::{
         camera::Exposure,
@@ -566,7 +566,6 @@ pub fn apply_sky_environment(
             });
         }
     }
-    let _ = irradiance;
 }
 
 /// Radius/quality of the sky dome. A huge inverted sphere is cheaper and more

@@ -61,7 +61,6 @@ impl Plugin for PlayerPlugin {
                 (
                     movement::read_input,
                     camera::camera_look,
-                    character::sync_body_parts,
                     camera::camera_follow,
                 )
                     .chain(),

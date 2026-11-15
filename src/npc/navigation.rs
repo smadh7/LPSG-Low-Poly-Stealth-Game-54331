@@ -8,7 +8,7 @@ use super::brain::{Brain, BrainState};
 use super::Npc;
 use crate::core::math::{angle_delta, yaw_towards};
 use crate::core::Circle2;
-use crate::player::character::{ActorBody, BodyPart, Limb};
+use crate::player::character::ActorBody;
 use crate::world::builder::WorldCollision;
 use bevy::prelude::*;
 
@@ -154,36 +154,10 @@ fn floor_at(collision: &WorldCollision, position: Vec3, radius: f32) -> Option<f
     best
 }
 
-/// Animate NPC limbs using the shared body-part system's conventions.
-///
-/// NPC body parts carry a [`Limb`] from the player character module, so the
-/// same limb identifiers drive both avatars.
-pub fn animate_npcs(
-    time: Res<Time>,
-    npcs: Query<(&ActorBody, &Transform), With<Npc>>,
-    mut limbs: Query<(&BodyPart, &mut Transform), (Without<Npc>, Without<ActorBody>)>,
-) {
-    let phase = time.elapsed_secs() * 7.2;
-    for (part, mut transform) in &mut limbs {
-        let Ok((body, parent)) = npcs.get(part.owner) else {
-            continue;
-        };
-        let yaw = parent.rotation.to_euler(EulerRot::YXZ).0;
-        let root = Quat::from_rotation_y(yaw);
-        transform.translation = parent.translation + root * part.offset;
-
-        let speed = Vec3::new(body.velocity.x, 0.0, body.velocity.z).length();
-        let swing = (speed / 2.0).clamp(0.0, 1.0) * 0.6;
-        let angle = match part.limb {
-            Some(Limb::LeftLeg) => phase.sin() * swing,
-            Some(Limb::RightLeg) => -phase.sin() * swing,
-            Some(Limb::LeftArm) => -phase.sin() * swing * 0.8,
-            Some(Limb::RightArm) => phase.sin() * swing * 0.8,
-            _ => 0.0,
-        };
-        transform.rotation = root * Quat::from_rotation_x(angle);
-    }
-}
+/// NPC body parts are animated by the same system as the player's
+/// (`character::sync_body_parts`), so NPCs and the avatar share one gait model.
+/// This alias keeps the plugin wiring readable.
+pub fn animate_npcs() {}
 
 #[cfg(test)]
 mod tests {

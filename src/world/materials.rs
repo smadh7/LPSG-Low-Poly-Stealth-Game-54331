@@ -12,11 +12,10 @@
 //!   what makes PBR lighting read as realistic.
 
 use bevy::{
-    image::{ImageAddressMode, ImageFilterMode, ImageSampler, ImageSamplerDescriptor},
+    image::{ImageAddressMode, ImageFilterMode, ImageSampler},
     pbr::{ExtendedMaterial, MaterialExtension, StandardMaterial},
     prelude::*,
-    render::render_resource::AsBindGroup,
-    shader::ShaderRef,
+    render::render_resource::{AsBindGroup, ShaderRef},
 };
 
 use super::mesh_kit::MatId;

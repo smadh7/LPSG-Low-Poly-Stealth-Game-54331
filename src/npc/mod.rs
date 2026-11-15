@@ -73,7 +73,7 @@ impl NpcRole {
     /// Staff wear the resort uniform (gold-accented linen for front of house,
     /// navy for security); guests are dressed in plausible holiday clothing and
     /// each one gets a different skin tone so the crowd never looks cloned.
-    pub fn outfit(self, variety: u8) -> crate::player::character::Outfit {
+    pub fn character_outfit(self, variety: u8) -> crate::player::character::Outfit {
         use crate::player::character::{GarmentColor as G, Outfit, SkinTone};
         let skin = match variety % 6 {
             0 => SkinTone::Porcelain,
@@ -131,6 +131,45 @@ impl NpcRole {
             NpcRole::SecurityGuard => Color::srgb(0.90, 0.35, 0.32),
             NpcRole::Target => Color::srgb(0.85, 0.30, 0.55),
         }
+    }
+}
+
+/// A named destination in an NPC's routine.
+#[derive(Debug, Clone)]
+pub struct Waypoint {
+    pub position: Vec3,
+    /// Seconds spent idling at this stop.
+    pub wait: f32,
+    /// What the NPC appears to be doing while stopped.
+    pub activity: &'static str,
+}
+
+impl Waypoint {
+    pub fn new(position: Vec3, wait: f32, activity: &'static str) -> Self {
+        Self {
+            position,
+            wait,
+            activity,
+        }
+    }
+}
+
+/// Identity of an NPC: who they are and where they belong.
+#[derive(Component, Debug, Clone)]
+pub struct NpcIdentity {
+    pub name: &'static str,
+    pub role: NpcRole,
+    pub zone: ZoneId,
+}
+
+/// Plugin wiring the NPC population and its per-frame systems.
+pub struct NpcPlugin;
+
+impl Plugin for NpcPlugin {
+    fn build(&self, app: &mut App) {
+        app.add_systems(Startup, spawn::spawn_npcs)
+            .add_systems(FixedUpdate, (navigation::steer_npcs, navigation::npc_collisions))
+            .add_systems(Update, spawn::update_badges);
     }
 }
 

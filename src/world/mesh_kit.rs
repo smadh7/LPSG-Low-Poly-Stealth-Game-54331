@@ -166,7 +166,7 @@ pub fn merge_into(target: &mut Mesh, other: Mesh) {
     let mut uvs: Vec<[f32; 2]> = attributes_float2(target, Mesh::ATTRIBUTE_UV_0);
     let mut indices: Vec<u32> = target
         .indices()
-        .map(|i| i.iter().collect::<Vec<u32>>())
+        .map(|i| i.iter().map(|v| v as u32).collect::<Vec<u32>>())
         .unwrap_or_default();
 
     positions.extend(attributes_float3(&other, Mesh::ATTRIBUTE_POSITION));
@@ -182,7 +182,10 @@ pub fn merge_into(target: &mut Mesh, other: Mesh) {
     target.insert_indices(Indices::U32(indices));
 }
 
-fn attributes_float3(mesh: &Mesh, attribute: bevy::render::mesh::MeshVertexAttribute) -> Vec<[f32; 3]> {
+fn attributes_float3(
+    mesh: &Mesh,
+    attribute: bevy::render::mesh::MeshVertexAttribute,
+) -> Vec<[f32; 3]> {
     match mesh.attribute(attribute) {
         Some(values) => values
             .as_float3()
@@ -192,7 +195,10 @@ fn attributes_float3(mesh: &Mesh, attribute: bevy::render::mesh::MeshVertexAttri
     }
 }
 
-fn attributes_float2(mesh: &Mesh, attribute: bevy::render::mesh::MeshVertexAttribute) -> Vec<[f32; 2]> {
+fn attributes_float2(
+    mesh: &Mesh,
+    attribute: bevy::render::mesh::MeshVertexAttribute,
+) -> Vec<[f32; 2]> {
     match mesh.attribute(attribute) {
         Some(Mesh::VertexAttributeValues::Float32x2(values)) => values.clone(),
         _ => Vec::new(),

@@ -6,7 +6,8 @@
 
 use super::brain::{Brain, BrainState};
 use super::schedule::RoutineStep;
-use super::{Npc, NpcIdentity, NpcRole};
+use super::{NpcIdentity, Waypoint};
+use super::{Npc, NpcRole};
 use crate::core::ZoneId;
 use crate::player::character::{
     spawn_humanoid, ActorBody, CharacterMeshes, HumanoidRig, OutfitMaterials,
@@ -158,7 +159,7 @@ pub fn spawn_npcs(
 
     for (index, spec) in npc_specs().into_iter().enumerate() {
         let variety = index as u8;
-        let outfit = spec.role.outfit(variety);
+        let outfit = spec.role.character_outfit(variety);
 
         // Start at the NPC's first waypoint so routines spread out.
         let start = spec

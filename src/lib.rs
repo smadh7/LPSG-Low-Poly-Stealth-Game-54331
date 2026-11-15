@@ -43,6 +43,8 @@ use bevy::{
     window::{CursorGrabMode, PresentMode, WindowResolution},
 };
 
+use player::character;
+
 /// Top level application flow.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash, States)]
 pub enum AppState {
@@ -118,7 +120,8 @@ impl Plugin for GamePlugin {
         ))
         .add_systems(Startup, setup_global_environment)
 
-        .add_systems(Update, (handle_state_transitions, capture_cursor, log_smoke_progress));
+        .add_systems(Update, (handle_state_transitions, capture_cursor, log_smoke_progress))
+        .add_systems(Update, character::sync_body_parts);
     }
 }
 

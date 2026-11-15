@@ -68,16 +68,22 @@ pub struct PlayerVisual;
 /// The parts of a character that can be animated.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Limb {
-    LeftLeg,
-    RightLeg,
-    LeftArm,
-    RightArm,
-    Torso,
-    Head,
-    /// Pelvis: follows the torso but never rotates (see `sync_body_parts`).
     Hips,
-    /// Neck/collar: follows the torso exactly.
+    Torso,
     Neck,
+    Head,
+    LeftArm,
+    LeftForearm,
+    LeftHand,
+    RightArm,
+    RightForearm,
+    RightHand,
+    LeftLeg,
+    LeftShin,
+    LeftFoot,
+    RightLeg,
+    RightShin,
+    RightFoot,
 }
 
 /// Joint positions for the default 1.78 m figure.
