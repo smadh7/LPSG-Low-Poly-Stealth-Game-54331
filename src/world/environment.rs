@@ -383,6 +383,13 @@ pub fn generate_environment_cubemap(size: u32, palette: &SkyPalette) -> Image {
         | TextureUsages::COPY_DST
         | TextureUsages::COPY_SRC
         | TextureUsages::RENDER_ATTACHMENT;
+    // A 6-layer D2 texture is *not* a cube map until we say so: the environment
+    // bind group declares a Cube view, and creating a D2Array view there is a
+    // hard wgpu validation error.
+    image.texture_view_descriptor = Some(bevy::render::render_resource::TextureViewDescriptor {
+        dimension: Some(bevy::render::render_resource::TextureViewDimension::Cube),
+        ..default()
+    });
     image.sampler = ImageSampler::Descriptor(ImageSamplerDescriptor {
         address_mode_u: ImageAddressMode::ClampToEdge,
         address_mode_v: ImageAddressMode::ClampToEdge,
