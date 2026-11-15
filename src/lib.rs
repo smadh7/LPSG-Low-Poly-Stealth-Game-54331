@@ -41,6 +41,7 @@ pub mod world;
 use bevy::{prelude::*, window::CursorGrabMode};
 
 use bevy::render::view::screenshot::{save_to_disk, Screenshot};
+use player::camera::ThirdPersonCamera;
 use player::character;
 
 /// Top level application flow.
@@ -256,15 +257,26 @@ impl CaptureQueue {
 /// run, so the follow camera cannot drift the shot.
 fn capture_lock_camera(
     mut commands: Commands,
-    mut camera: Query<(Entity, &mut Transform), With<Camera3d>>,
+    mut camera: Query<(Entity, &mut Transform), With<ThirdPersonCamera>>,
+    all_cameras: Query<Entity, (With<Camera3d>, Without<ThirdPersonCamera>)>,
+    mut warned: Local<bool>,
     queue: Option<Res<CaptureQueue>>,
 ) {
+    if !*warned && !all_cameras.is_empty() {
+        *warned = true;
+        info!("CAPTURE note: {} extra 3D cameras present", all_cameras.iter().count());
+    }
     let Some(queue) = queue else { return };
     if queue.phase == CapturePhase::Finished {
         return;
     }
     let Some(shot) = queue.current() else { return };
-    if let Ok((entity, mut transform)) = camera.single_mut() {
+    let found = camera.iter_mut().next();
+    if found.is_none() && !*warned {
+        *warned = true;
+        info!("CAPTURE: no third-person camera found");
+    }
+    if let Some((entity, mut transform)) = found {
         transform.translation = shot.eye;
         transform.rotation = Quat::from_euler(EulerRot::YXZ, shot.yaw, shot.pitch, 0.0);
         if let Some(ev100) = shot.ev100 {
