@@ -53,7 +53,7 @@ use super::builder::LevelEntity;
 ///
 /// It is still physically meaningful: raising or lowering it changes brightness
 /// exactly like a real exposure stop, which is what the graphics presets use.
-pub const EXPOSURE: Exposure = Exposure { ev100: 11.4 };
+pub const EXPOSURE: Exposure = Exposure { ev100: 13.6 };
 
 /// Sunlight on a clear tropical afternoon, in lux.
 pub const SUN_LUX: f32 = 82_000.0;
@@ -66,26 +66,28 @@ pub const SUN_LUX: f32 = 82_000.0;
 /// and bloom thresholds all have to use the same units or they vanish.
 pub const SKY_RADIANCE: f32 = 9_000.0;
 
-/// Skybox brightness.
+/// Skybox brightness: converts the unit-range cubemap to cd/m².
 ///
-/// The skybox pass writes its colour straight to the HDR target *without* going
-/// through exposure, so this is in display-referred units (0..~2), not physical
-/// radiance. Matching the sky to the lit scene therefore means picking this so
-/// it sits where the tonemapper expects, not by converting to cd/m².
-pub const SKY_BRIGHTNESS: f32 = 1.0;
+/// The tonemapper applies exposure to the whole HDR target, including the
+/// skybox, so the sky has to be in radiance units like everything else.
+pub const SKY_BRIGHTNESS: f32 = SKY_RADIANCE;
 
-/// Haze colour for distance fog.
-///
-/// Bevy mixes the fog base colour in *before* exposure (like the skybox), while
-/// its directional in-scattering term is multiplied by the sun. Display-referred
-/// values are therefore the consistent choice here.
+/// Haze colour for distance fog, in radiance (see [`SKY_RADIANCE`]).
 pub fn fog_color() -> Color {
-    Color::LinearRgba(LinearRgba::rgb(0.52, 0.63, 0.78))
+    Color::LinearRgba(LinearRgba::rgb(
+        0.55 * SKY_RADIANCE,
+        0.68 * SKY_RADIANCE,
+        0.85 * SKY_RADIANCE,
+    ))
 }
 
-/// Sunlit haze colour, used by fog's directional (in-scattering) term.
+/// Sunlit haze colour, used by fog's in-scattering term.
 pub fn fog_sun_color() -> Color {
-    Color::LinearRgba(LinearRgba::rgb(1.0, 0.90, 0.76))
+    Color::LinearRgba(LinearRgba::rgb(
+        1.10 * SKY_RADIANCE,
+        0.98 * SKY_RADIANCE,
+        0.80 * SKY_RADIANCE,
+    ))
 }
 
 /// Direction *towards* the sun. Shared by lighting, sky generation and any
@@ -567,9 +569,12 @@ pub fn setup_environment(mut commands: Commands) {
 
     // A little sky bounce at ground level. The environment map does most of the
     // work, but a touch of upward fill keeps shadowed undersides readable.
+    // Sky bounce. This is what keeps shaded facades and interiors readable:
+    // the sun provides ~82 klx, so the sky fill has to be a real fraction of
+    // that rather than a token value.
     commands.insert_resource(AmbientLight {
         color: Color::srgb(0.72, 0.82, 0.95),
-        brightness: 40.0,
+        brightness: 1_400.0,
         affects_lightmapped_meshes: false,
     });
 
@@ -613,7 +618,7 @@ pub fn apply_sky_environment(
             commands.entity(camera).insert(EnvironmentMapLight {
                 diffuse_map: diffuse.clone(),
                 specular_map: specular.clone(),
-                intensity: 1_100.0,
+                intensity: 15_000.0,
                 rotation: Quat::IDENTITY,
                 affects_lightmapped_mesh_diffuse: true,
             });
