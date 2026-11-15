@@ -87,6 +87,8 @@ fn spawn_test_player(mut commands: Commands, spawn: Res<PendingPlayerSpawn>) {
                 owner: player,
                 offset,
                 limb: None,
+                rest_rotation: Quat::IDENTITY,
+                scale: Vec3::ONE,
             },
             PlayerVisual,
             Transform::from_translation(spawn.position + offset),

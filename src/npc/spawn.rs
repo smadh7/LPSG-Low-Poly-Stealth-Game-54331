@@ -21,8 +21,9 @@ struct NpcSpec {
     role: NpcRole,
     zone: ZoneId,
     routine: Vec<(Vec3, f32, &'static str)>,
-    /// Preferred walking speed (currently informational: navigation derives
-    /// speed from the waypoint's dwell time).
+    /// Preferred walking speed. Navigation derives speed from a waypoint's
+    /// dwell time, so this is authoring metadata used by the routine planner.
+    #[allow(dead_code)]
     speed_hint: f32,
 }
 
