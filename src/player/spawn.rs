@@ -64,7 +64,7 @@ pub fn spawn_player(
             ..default()
         },
         Tonemapping::TonyMcMapface,
-        bevy::render::camera::Exposure::BLENDER,
+        crate::world::environment::EXPOSURE,
         Projection::from(PerspectiveProjection {
             fov: 68f32.to_radians(),
             near: 0.08,
@@ -78,9 +78,11 @@ pub fn spawn_player(
         // Aerial perspective: warm, low-density haze that grows with distance.
         // Exponential-squared falloff looks far more natural than linear fog.
         bevy::pbr::DistanceFog {
-            color: Color::srgba(0.72, 0.80, 0.88, 1.0),
-            falloff: bevy::pbr::FogFalloff::ExponentialSquared { density: 0.0022 },
-            directional_light_color: Color::srgba(1.0, 0.94, 0.82, 1.0),
+            // Fog is mixed in *before* exposure, so these colours are radiance,
+            // not display colours (see `environment::SKY_RADIANCE`).
+            color: crate::world::environment::fog_color(),
+            falloff: bevy::pbr::FogFalloff::ExponentialSquared { density: 0.0016 },
+            directional_light_color: crate::world::environment::fog_sun_color(),
             directional_light_exponent: 12.0,
             ..default()
         },

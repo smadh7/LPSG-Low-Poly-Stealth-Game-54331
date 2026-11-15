@@ -147,21 +147,14 @@ jobs:
           cargo build --bin hitman_lowpoly
           { ldconfig -p | grep -i xkbcommon; ls -l /usr/lib/x86_64-linux-gnu/libxkbcommon*; } > shots/diag.txt 2>&1 || true
           cat shots/diag.txt || true
-          capture() {
-            name="$1"; spec="$2"
-            HITMAN_CAPTURE="$spec" xvfb-run -a -s "-screen 0 1600x900x24" \
-              ./target/debug/hitman_lowpoly > "shots/$name.log" 2>&1 || true
-            if [ -f "captures/frame_${spec%%:*}.png" ]; then
-              mv "captures/frame_${spec%%:*}.png" "shots/$name.png"
-            fi
-          }
-          # Eye position then look-at target: "x,y,z, tx,ty,tz".
-          capture arrival   "150:0,14,-78,0,6,-6"
-          capture lobby     "150:0,2.6,20,0,2.8,-6"
-          capture gardens   "150:-20,3.5,14,6,2.5,-18"
-          capture pool      "150:36,9,-6,36,0.5,-26"
-          capture restaurant "150:48,4.5,6,32,2.2,-8"
-          capture roof      "150:-16,12,30,0,26,0"
+          # One process, six viewpoints: the engine boot and level upload are
+          # the expensive part, so batching keeps this step fast.
+          export HITMAN_CAPTURE=\
+          "01_arrival:0,2.2,-34,0,2.5,0;02_lobby:0,2.6,20,0,2.4,-4;03_gardens:-20,1.8,10,4,1.6,-14;04_pool:40,1.8,-12,30,1.0,-26;05_restaurant:46,3.6,8,34,2.2,-4;06_closeup:0.6,1.55,-3.0,0,1.55,-6;07_overview:0,42,-96,0,4,-6"
+          timeout 2400 xvfb-run -a -s "-screen 0 1600x900x24" \
+            ./target/debug/hitman_lowpoly > shots/capture.log 2>&1 || true
+          sed 's/\x1b\[[0-9;]*m//g' shots/capture.log | tail -25
+          mv captures/*.png shots/ 2>/dev/null || true
           ls -l shots || true
 
       - name: Publish screenshots
@@ -174,6 +167,7 @@ jobs:
           set -e
           [ -d shots ] || exit 0
           cd shots
+          rm -f diag.txt
           git init -q -b ci-shots
           git config user.email "ci@example.com"
           git config user.name "CI"

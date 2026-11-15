@@ -23,6 +23,16 @@ use super::mesh_kit::MatId;
 /// Where the generated texture maps live, relative to the executable.
 pub const TEXTURE_DIR: &str = "textures";
 
+/// `uv_transform` scale that makes one texture image cover `metres`.
+///
+/// Geometry UVs are authored in **metres** (see `mesh_kit`), so the scale is the
+/// reciprocal of the tile size. Getting this backwards is subtle and very
+/// visible: it packs ~40 texture repeats into every metre, which reads as grey
+/// mush at any distance.
+fn uv_scale(metres: f32) -> Vec2 {
+    Vec2::splat(1.0 / metres.max(0.01))
+}
+
 /// Metres covered by one texture repeat, per material.
 fn tiling(mat: MatId) -> Vec2 {
     let m = match mat {
@@ -53,7 +63,7 @@ fn tiling(mat: MatId) -> Vec2 {
         MatId::Fabric => 0.5,
         MatId::Skin => 0.5,
     };
-    Vec2::splat(1.0 / m)
+    uv_scale(m)
 }
 
 /// Textured material name in the asset folder (water uses its normal map only).
@@ -147,6 +157,8 @@ impl MaterialLibrary {
                 occlusion_texture: Some(orm.clone()),
                 metallic_roughness_texture: Some(orm),
                 perceptual_roughness: 1.0,
+                // The ORM map's blue channel is a *multiplier* on this value,
+                // not a replacement, so 1.0 means "use the map as authored".
                 metallic: 1.0,
                 uv_transform: bevy::math::Affine2::from_scale(tiling(mat)),
                 ..default()
@@ -218,14 +230,16 @@ impl MaterialLibrary {
             },
         });
 
+        // Interior lamps and screens, in scene-referred radiance: a warm bulb is
+        // a few thousand cd/m², and these read as glowing against the exposure.
         let emissive_warm = materials.add(StandardMaterial {
             base_color: Color::srgb(0.95, 0.85, 0.70),
-            emissive: LinearRgba::new(9.0, 6.8, 4.2, 1.0),
+            emissive: LinearRgba::new(26_000.0, 18_000.0, 10_000.0, 1.0),
             ..default()
         });
         let emissive_cool = materials.add(StandardMaterial {
             base_color: Color::srgb(0.80, 0.90, 1.0),
-            emissive: LinearRgba::new(2.6, 4.4, 6.2, 1.0),
+            emissive: LinearRgba::new(7_000.0, 12_000.0, 17_000.0, 1.0),
             ..default()
         });
         let glass = materials.add(StandardMaterial {

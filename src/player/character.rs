@@ -469,9 +469,10 @@ pub fn build_outfit_materials(
             occlusion_texture: Some(skin_orm.clone()),
             metallic_roughness_texture: Some(skin_orm.clone()),
             perceptual_roughness: 1.0,
-            metallic: 1.0,
+            metallic: 0.0,
             reflectance: 0.35,
-            uv_transform: bevy::math::Affine2::from_scale(Vec2::splat(2.0)),
+            // Skin detail is sub-millimetre: the map tiles every 6 cm.
+            uv_transform: bevy::math::Affine2::from_scale(Vec2::splat(16.0)),
             ..default()
         })
     });
@@ -489,8 +490,10 @@ pub fn build_outfit_materials(
             occlusion_texture: Some(fabric_orm.clone()),
             metallic_roughness_texture: Some(fabric_orm.clone()),
             perceptual_roughness: rough,
-            metallic: 1.0,
-            uv_transform: bevy::math::Affine2::from_scale(Vec2::splat(2.0)),
+            metallic: 0.0,
+            // Garment UVs are not authored in metres, so a fixed weave scale is
+            // both simpler and more predictable than a physical one.
+            uv_transform: bevy::math::Affine2::from_scale(Vec2::splat(8.0)),
             ..default()
         })
     };

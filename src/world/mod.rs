@@ -47,7 +47,6 @@ impl Plugin for WorldPlugin {
                 Startup,
                 (
                     environment::setup_environment,
-                    environment::setup_sky_mesh,
                     environment::apply_sky_environment,
                     environment::apply_shadow_settings,
                 )

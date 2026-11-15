@@ -100,7 +100,7 @@ impl Plugin for GamePlugin {
                 .set(WindowPlugin {
                     primary_window: Some(Window {
                         title: "HITMAN — Coral Palm Resort".to_string(),
-                        resolution: (1600.0, 900.0).into(),
+                        resolution: (1600.0f32, 900.0f32).into(),
                         ..default()
                     }),
                     ..default()
@@ -132,7 +132,6 @@ impl Plugin for GamePlugin {
         .add_systems(Startup, setup_global_environment)
 
         .add_systems(Update, (handle_state_transitions, capture_cursor, log_smoke_progress))
-        .init_resource::<CaptureClock>()
         .add_systems(Startup, capture_setup)
         .add_systems(PostUpdate, capture_lock_camera)
         .add_systems(Update, capture_tick)
@@ -140,99 +139,164 @@ impl Plugin for GamePlugin {
     }
 }
 
-/// Screenshot mode: `HITMAN_CAPTURE=frame:x,y,z,yaw` renders the game from a
-/// fixed camera on that frame, dumps it to `captures/frame_<frame>.png` and
-/// exits. It is the tool used to visually verify the level on a headless
-/// runner, and it is inert in normal play.
-fn capture_setup(mut state: ResMut<NextState<AppState>>) {
+/// Screenshot mode: `HITMAN_CAPTURE="name:x,y,z,tx,ty,tz;..."` renders the
+/// level from each listed pose inside a *single* run of the game and writes
+/// `captures/<name>.png` for each one. Doing all viewpoints in one process
+/// matters: booting the engine and uploading the level costs far more than the
+/// frames themselves, especially on a software rasteriser.
+///
+/// Inert unless the variable is set, so normal play is unaffected.
+fn capture_setup(mut state: ResMut<NextState<AppState>>, mut commands: Commands) {
     let Ok(spec) = std::env::var("HITMAN_CAPTURE") else {
         return;
     };
+    let mut shots: Vec<CaptureShot> = Vec::new();
+    for entry in spec.split(';').filter(|e| !e.trim().is_empty()) {
+        let (name, params) = entry.split_once(':').unwrap_or(("frame", entry));
+        let values: Vec<f32> = params
+            .split(',')
+            .filter_map(|v| v.trim().parse().ok())
+            .collect();
+        if values.len() < 3 {
+            continue;
+        }
+        let eye = Vec3::new(values[0], values[1], values[2]);
+        let (yaw, pitch) = if values.len() >= 6 {
+            // Position then look-at target: much easier to aim than raw angles.
+            let target = Vec3::new(values[3], values[4], values[5]);
+            let dir = (target - eye).normalize_or_zero();
+            (dir.x.atan2(-dir.z), dir.y.clamp(-0.99, 0.99).asin())
+        } else {
+            (
+                values[3].to_radians(),
+                values.get(4).copied().unwrap_or(-0.18),
+            )
+        };
+        shots.push(CaptureShot {
+            name: name.trim().to_string(),
+            eye,
+            yaw,
+            pitch,
+        });
+    }
+    if shots.is_empty() {
+        warn!("HITMAN_CAPTURE had no usable viewpoints");
+        return;
+    }
     state.set(AppState::Playing);
-    // Format: frame:x,y,z,yaw[,pitch]
-    let (frame, params) = spec
-        .split_once(':')
-        .unwrap_or(("120", spec.as_str()));
-    let values: Vec<f32> = params
-        .split(',')
-        .filter_map(|v| v.trim().parse().ok())
-        .collect();
-    if values.len() < 4 {
-        return;
-    }
-    // 6+ values means "position then look-at target", which is far easier to
-    // aim than raw angles. 4-5 values keep the yaw/pitch form.
-    let (translation, yaw, pitch) = if values.len() >= 6 {
-        let eye = Vec3::new(values[0], values[1], values[2]);
-        let target = Vec3::new(values[3], values[4], values[5]);
-        let dir = (target - eye).normalize_or_zero();
-        let yaw = dir.x.atan2(-dir.z);
-        let pitch = dir.y.clamp(-0.99, 0.99).asin();
-        (eye, yaw, pitch)
-    } else {
-        let eye = Vec3::new(values[0], values[1], values[2]);
-        (eye, values[3].to_radians(), values.get(4).copied().unwrap_or(-0.18))
-    };
-    info!("CAPTURE armed for frame {frame}");
-    // Written into a resource, not the camera, because the follow camera owns
-    // the camera transform and would overwrite anything set here.
-    CAPTURE_VIEW.with(|view| {
-        *view.borrow_mut() = Some((translation, yaw, pitch));
+    info!("CAPTURE armed for {} viewpoints", shots.len());
+    commands.insert_resource(CaptureQueue {
+        shots,
+        index: 0,
+        wait: CAPTURE_WARMUP_FRAMES,
+        phase: CapturePhase::Warmup,
     });
-    CAPTURE_FRAME.with(|cell| cell.set(Some(frame.trim().parse().unwrap_or(120))));
 }
 
-thread_local! {
-    /// Requested camera pose for screenshot mode.
-    static CAPTURE_VIEW: std::cell::RefCell<Option<(Vec3, f32, f32)>> =
-        const { std::cell::RefCell::new(None) };
-    /// Requested screenshot frame for screenshot mode.
-    static CAPTURE_FRAME: std::cell::Cell<Option<u32>> = const { std::cell::Cell::new(None) };
+/// Frames rendered before the first screenshot, giving the renderer time to
+/// build pipelines and upload the level.
+const CAPTURE_WARMUP_FRAMES: u32 = 90;
+/// Frames rendered after moving the camera, so shadows and TAA settle.
+const CAPTURE_SETTLE_FRAMES: u32 = 8;
+/// Frames to wait for a screenshot to be encoded and written to disk.
+const CAPTURE_SAVE_FRAMES: u32 = 12;
+
+/// One scripted camera pose.
+#[derive(Clone, Debug)]
+pub struct CaptureShot {
+    pub name: String,
+    pub eye: Vec3,
+    pub yaw: f32,
+    pub pitch: f32,
 }
 
-/// Pending screenshot request.
+/// Walks through the requested viewpoints, one screenshot each.
 #[derive(Resource)]
-pub struct CaptureRequest {
-    pub frame: u32,
+pub struct CaptureQueue {
+    pub shots: Vec<CaptureShot>,
+    pub index: usize,
+    /// Frames still to render before the next action.
+    pub wait: u32,
+    /// What the queue is waiting for.
+    pub phase: CapturePhase,
 }
 
-/// Frame counter for the screenshot harness.
-#[derive(Resource, Default)]
-pub struct CaptureClock(pub u32);
-
-/// Park the camera at the requested pose *after* every gameplay camera system
-/// has run, so scripted gameplay cannot drift the shot.
-fn capture_lock_camera(mut camera: Query<&mut Transform, With<Camera3d>>) {
-    CAPTURE_VIEW.with(|view| {
-        let pose = *view.borrow();
-        if let Some((translation, yaw, pitch)) = pose {
-            if let Ok(mut transform) = camera.single_mut() {
-                transform.translation = translation;
-                transform.rotation = Quat::from_euler(EulerRot::YXZ, yaw, pitch, 0.0);
-            }
-        }
-    });
+/// Where the capture queue is in its cycle.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum CapturePhase {
+    /// Letting the renderer warm up before the first shot.
+    Warmup,
+    /// Holding the camera still so shadows, TAA and exposure settle.
+    Settle,
+    /// A screenshot has been requested; waiting for it to reach the disk.
+    Saving,
+    /// Every viewpoint has been written.
+    Finished,
 }
 
-/// Render the requested frame, save it, then exit.
-fn capture_tick(mut commands: Commands, mut clock: ResMut<CaptureClock>) {
-    let Some(frame) = CAPTURE_FRAME.with(|cell| cell.get()) else {
-        return;
-    };
-    clock.0 += 1;
-    // Give the renderer a moment to build pipelines and upload the level.
-    if clock.0 == frame {
-        let path = format!("captures/frame_{frame}.png");
-        if let Some(parent) = std::path::Path::new(&path).parent() {
-            let _ = std::fs::create_dir_all(parent);
-        }
-        commands
-            .spawn(Screenshot::primary_window())
-            .observe(save_to_disk(path.clone()));
-        info!("CAPTURE writing {path}");
+impl CaptureQueue {
+    fn current(&self) -> Option<&CaptureShot> {
+        self.shots.get(self.index)
     }
-    if clock.0 == frame + 30 {
-        std::process::exit(0);
+}
+
+/// Park the camera at the current pose *after* every gameplay camera system has
+/// run, so the follow camera cannot drift the shot.
+fn capture_lock_camera(
+    mut camera: Query<&mut Transform, With<Camera3d>>,
+    queue: Option<Res<CaptureQueue>>,
+) {
+    let Some(queue) = queue else { return };
+    if queue.phase == CapturePhase::Finished {
+        return;
+    }
+    let Some(shot) = queue.current() else { return };
+    if let Ok(mut transform) = camera.single_mut() {
+        transform.translation = shot.eye;
+        transform.rotation = Quat::from_euler(EulerRot::YXZ, shot.yaw, shot.pitch, 0.0);
+    }
+}
+
+/// Advance the capture queue: render, save, move on, exit when finished.
+fn capture_tick(mut commands: Commands, queue: Option<ResMut<CaptureQueue>>) {
+    let Some(mut queue) = queue else { return };
+    if queue.phase == CapturePhase::Finished {
+        return;
+    }
+    if queue.wait > 0 {
+        queue.wait -= 1;
+        return;
+    }
+    match queue.phase {
+        CapturePhase::Warmup => {
+            queue.phase = CapturePhase::Settle;
+            queue.wait = CAPTURE_SETTLE_FRAMES;
+        }
+        CapturePhase::Settle => {
+            let Some(shot) = queue.current().cloned() else {
+                queue.phase = CapturePhase::Finished;
+                std::process::exit(0);
+            };
+            let _ = std::fs::create_dir_all("captures");
+            let path = format!("captures/{}.png", shot.name);
+            commands
+                .spawn(Screenshot::primary_window())
+                .observe(save_to_disk(path.clone()));
+            info!("CAPTURE {} -> {}", shot.name, path);
+            queue.index += 1;
+            queue.phase = CapturePhase::Saving;
+            queue.wait = CAPTURE_SAVE_FRAMES;
+        }
+        CapturePhase::Saving => {
+            if queue.current().is_none() {
+                queue.phase = CapturePhase::Finished;
+                info!("CAPTURE finished {} viewpoints", queue.shots.len());
+                std::process::exit(0);
+            }
+            queue.phase = CapturePhase::Settle;
+            queue.wait = CAPTURE_SETTLE_FRAMES;
+        }
+        CapturePhase::Finished => {}
     }
 }
 

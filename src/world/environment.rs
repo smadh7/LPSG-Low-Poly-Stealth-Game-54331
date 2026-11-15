@@ -38,7 +38,44 @@ use bevy::{
     },
 };
 
-use super::builder::LevelEntity;
+use bevy::core_pipeline::skybox::Skybox;
+
+/// Camera exposure for the 82,000 lux afternoon sun.
+///
+/// `Exposure::BLENDER` (ev100 ≈ 9.7) is calibrated for a ~1,000 lux studio. Under
+/// a real tropical sun it renders everything pure white — the physical light
+/// levels and the physical exposure have to agree. `Exposure::SUNLIGHT` (ev100
+/// 15) is the matching value for outdoor daylight.
+pub const EXPOSURE: Exposure = Exposure::SUNLIGHT;
+
+/// Luminance of the sky, in cd/m², on a clear tropical afternoon.
+///
+/// Every HDR quantity in the game is expressed in real units: the sun is 82,000
+/// lux, the sky about 9,000 cd/m². That only works because the camera exposure
+/// (see [`EXPOSURE`]) is the matching physical value. Fog, emissive materials
+/// and bloom thresholds all have to use the same units or they vanish.
+pub const SKY_RADIANCE: f32 = 9_000.0;
+
+/// Skybox brightness: converts the unit-range cubemap into cd/m².
+pub const SKY_BRIGHTNESS: f32 = SKY_RADIANCE * 0.9;
+
+/// Haze colour in scene-referred units, for distance fog.
+pub fn fog_color() -> Color {
+    Color::LinearRgba(LinearRgba::rgb(
+        0.58 * SKY_RADIANCE,
+        0.68 * SKY_RADIANCE,
+        0.82 * SKY_RADIANCE,
+    ))
+}
+
+/// Sunlit haze colour, used by fog's directional (in-scattering) term.
+pub fn fog_sun_color() -> Color {
+    Color::LinearRgba(LinearRgba::rgb(
+        1.30 * SKY_RADIANCE,
+        1.15 * SKY_RADIANCE,
+        0.92 * SKY_RADIANCE,
+    ))
+}
 
 /// Direction *towards* the sun. Shared by lighting, sky generation and any
 /// system that wants lens glints or window highlights.
@@ -222,18 +259,6 @@ impl GraphicsSettings {
 // ---------------------------------------------------------------------------
 // Sky cubemap generation
 // ---------------------------------------------------------------------------
-
-fn srgb_encode(c: f32) -> f32 {
-    linear_to_srgb(c).clamp(0.0, 1.0)
-}
-
-fn linear_to_srgb(c: f32) -> f32 {
-    if c <= 0.0031308 {
-        c * 12.92
-    } else {
-        1.055 * c.powf(1.0 / 2.4) - 0.055
-    }
-}
 
 /// Cheap 3D value noise used for the cloud band.
 fn hash3(x: i32, y: i32, z: i32) -> f32 {
@@ -533,7 +558,7 @@ pub fn setup_environment(mut commands: Commands) {
     // work, but a touch of upward fill keeps shadowed undersides readable.
     commands.insert_resource(AmbientLight {
         color: Color::srgb(0.72, 0.82, 0.95),
-        brightness: 90.0,
+        brightness: 40.0,
         affects_lightmapped_meshes: false,
     });
 
@@ -560,6 +585,15 @@ pub fn apply_sky_environment(
     let diffuse = images.add(rough);
 
     for camera in &cameras {
+        // The visible sky is a real skybox pass: it is drawn at infinite depth,
+        // so it is never clipped by the far plane, and it costs one fullscreen
+        // draw with no geometry. A giant sky sphere (the previous approach) sat
+        // beyond the camera's far plane and was simply never rasterised.
+        commands.entity(camera).insert(Skybox {
+            image: specular.clone(),
+            brightness: SKY_BRIGHTNESS,
+            rotation: Quat::IDENTITY,
+        });
         if settings.environment_lighting {
             commands.entity(camera).insert(EnvironmentMapLight {
                 diffuse_map: diffuse.clone(),
@@ -570,44 +604,6 @@ pub fn apply_sky_environment(
             });
         }
     }
-}
-
-/// Radius/quality of the sky dome. A huge inverted sphere is cheaper and more
-/// controllable than a skybox pass for this map size.
-pub fn setup_sky_mesh(
-    mut commands: Commands,
-    mut meshes: ResMut<Assets<Mesh>>,
-    mut materials: ResMut<Assets<StandardMaterial>>,
-) {
-    let mesh = meshes.add(Sphere::new(1400.0).mesh().ico(3).expect("ico sphere"));
-    // Unlit so the dome is exactly the sky colour and never picks up shadows;
-    // bright emissive pushes it above the bloom threshold near the horizon.
-    let material = materials.add(StandardMaterial {
-        base_color: Color::srgb(
-            srgb_encode(TROPICAL_AFTERNOON.horizon.x),
-            srgb_encode(TROPICAL_AFTERNOON.horizon.y),
-            srgb_encode(TROPICAL_AFTERNOON.horizon.z + 0.12),
-        ),
-        emissive: LinearRgba::new(
-            TROPICAL_AFTERNOON.horizon.x * 1.6,
-            TROPICAL_AFTERNOON.horizon.y * 1.9,
-            TROPICAL_AFTERNOON.horizon.z * 2.4,
-            1.0,
-        ),
-        perceptual_roughness: 1.0,
-        metallic: 0.0,
-        unlit: true,
-        cull_mode: None,
-        ..default()
-    });
-    commands.spawn((
-        LevelEntity,
-        Name::new("Sky Dome"),
-        Mesh3d(mesh),
-        MeshMaterial3d(material),
-        Transform::default(),
-        bevy::pbr::NotShadowCaster,
-    ));
 }
 
 // ---------------------------------------------------------------------------
@@ -626,9 +622,20 @@ pub fn apply_post_processing(
     for (entity, mut projection) in &mut cameras {
         let mut camera = commands.entity(entity);
         camera.insert(Tonemapping::TonyMcMapface);
-        camera.insert(Exposure::BLENDER);
+        camera.insert(EXPOSURE);
         if settings.bloom {
-            camera.insert(Bloom::NATURAL);
+            // Bloom runs *before* tonemapping, so its threshold is in the same
+            // units as the lit scene. A threshold of 1.0 (the `NATURAL` preset)
+            // would bloom every sunlit surface white; this only catches lights,
+            // specular sun glints and the brightest sky.
+            camera.insert(Bloom {
+                prefilter: bevy::core_pipeline::bloom::BloomPrefilter {
+                    threshold: SKY_RADIANCE * 2.2,
+                    threshold_softness: 0.6,
+                },
+                intensity: 0.12,
+                ..Bloom::NATURAL
+            });
         } else {
             camera.remove::<Bloom>();
         }
