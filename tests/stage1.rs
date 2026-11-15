@@ -162,15 +162,10 @@ fn player_can_climb_the_ramp_to_the_restaurant() {
     // Start just south of the restaurant's outside stair and walk north.
     let mut app = physics_app(Vec3::new(34.0, 0.0, -24.0));
     app.add_systems(FixedUpdate, hitman_lowpoly::player::movement::player_physics);
-    let mut trace = Vec::new();
-    for frame in 0..600 {
+    for _ in 0..600 {
         app.world_mut().resource_mut::<PlayerIntent>().direction = Vec3::Z;
         step(&mut app, 1);
-        if frame % 40 == 0 {
-            trace.push(format!("{frame}:{:?}", player_transform(&mut app)));
-        }
     }
-    println!("restaurant climb trace: {}", trace.join(" "));
     let transform = player_transform(&mut app);
     assert!(
         transform.y > 1.5,
@@ -182,11 +177,11 @@ fn player_can_climb_the_ramp_to_the_restaurant() {
 fn player_can_descend_into_the_service_corridor() {
     // Walk south from the gardens onto the service staircase and down to the
     // corridor floor (-3.4 m): this proves negative-height spaces are walkable.
-    let mut app = physics_app(Vec3::new(-33.0, 0.0, 18.0));
+    let mut app = physics_app(Vec3::new(-33.0, 0.0, 24.0));
     app.add_systems(FixedUpdate, hitman_lowpoly::player::movement::player_physics);
     let mut lowest = f32::MAX;
     for _ in 0..900 {
-        app.world_mut().resource_mut::<PlayerIntent>().direction = Vec3::Z;
+        app.world_mut().resource_mut::<PlayerIntent>().direction = Vec3::NEG_Z;
         step(&mut app, 1);
         lowest = lowest.min(player_transform(&mut app).y);
     }
@@ -199,7 +194,7 @@ fn player_can_descend_into_the_service_corridor() {
 #[test]
 fn player_can_climb_the_penthouse_stair() {
     // The restricted penthouse is 29.8 m up a 72-step staircase.
-    let mut app = physics_app(Vec3::new(-30.5, 0.0, 22.0));
+    let mut app = physics_app(Vec3::new(-30.5, 0.0, 24.0));
     app.add_systems(FixedUpdate, hitman_lowpoly::player::movement::player_physics);
     for _ in 0..2400 {
         app.world_mut().resource_mut::<PlayerIntent>().direction = Vec3::Z;
