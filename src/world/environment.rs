@@ -42,13 +42,21 @@ use bevy::core_pipeline::Skybox;
 
 use super::builder::LevelEntity;
 
-/// Camera exposure for the 82,000 lux afternoon sun.
+/// Camera exposure for the tropical afternoon.
 ///
-/// `Exposure::BLENDER` (ev100 ≈ 9.7) is calibrated for a ~1,000 lux studio. Under
-/// a real tropical sun it renders everything pure white — the physical light
-/// levels and the physical exposure have to agree. `Exposure::SUNLIGHT` (ev100
-/// 15) is the matching value for outdoor daylight.
-pub const EXPOSURE: Exposure = Exposure::SUNLIGHT;
+/// This needs care, because Bevy applies exposure **twice** in the shading path:
+/// `pbr_functions.wgsl` pre-multiplies lights by `view.exposure`, and the
+/// tonemapper multiplies again. A physical `Exposure::SUNLIGHT` (ev100 15) under
+/// an 82,000 lux sun therefore lands ~3.6x overexposed, and the scene clips to
+/// white. The value here is the one that makes the *combined* transform land in
+/// range for the light levels in this level (`SUN_LUX`, [`SKY_RADIANCE`]).
+///
+/// It is still physically meaningful: raising or lowering it changes brightness
+/// exactly like a real exposure stop, which is what the graphics presets use.
+pub const EXPOSURE: Exposure = Exposure { ev100: 11.4 };
+
+/// Sunlight on a clear tropical afternoon, in lux.
+pub const SUN_LUX: f32 = 82_000.0;
 
 /// Luminance of the sky, in cd/m², on a clear tropical afternoon.
 ///
@@ -541,7 +549,7 @@ pub fn setup_environment(mut commands: Commands) {
         Name::new("Sun"),
         DirectionalLight {
             color: Color::srgb(1.0, 0.955, 0.885),
-            illuminance: 82_000.0,
+            illuminance: SUN_LUX,
             shadows_enabled: true,
             ..default()
         },
@@ -564,7 +572,11 @@ pub fn setup_environment(mut commands: Commands) {
         affects_lightmapped_meshes: false,
     });
 
-    info!("Environment: tropical afternoon, 82 k lux sun + sky IBL");
+    info!(
+        "Environment: tropical afternoon, {:.0} lux sun + sky IBL (exposure {})",
+        SUN_LUX / 1000.0,
+        EXPOSURE.ev100
+    );
 }
 
 /// Build the sky images and hand them to the camera. Runs after `setup_environment`

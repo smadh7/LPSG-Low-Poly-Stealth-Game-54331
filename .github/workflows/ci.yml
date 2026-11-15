@@ -282,7 +282,9 @@ jobs:
 
   windows:
     name: Build Windows release
-    if: github.event_name == 'workflow_dispatch' && inputs.windows
+    # Runs on every push to the working branch so the Section 11 deliverable
+    # never rots; also available on demand.
+    if: github.event_name == 'workflow_dispatch' && inputs.windows || github.event_name == 'push'
     runs-on: windows-latest
     timeout-minutes: 120
     steps:
@@ -291,15 +293,60 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           shared-key: windows-release
-      - name: cargo build --release
-        run: cargo build --release --message-format=short 2>&1 | Tee-Object -FilePath build.log
-      - name: Package
+
+      - name: Build and package the portable distribution
+        run: pwsh -NoProfile -File tools/package_windows.ps1
+
+      # Section 11 requires the packaged build to be verified as a release, not
+      # as a dev executable. This launches the shipped copy from a *different*
+      # directory, with the repository out of reach, and checks it really runs.
+      - name: Smoke-test the packaged build
+        shell: pwsh
         run: |
-          New-Item -ItemType Directory -Path dist -Force | Out-Null
-          Copy-Item target\release\hitman_lowpoly.exe dist\
-          Compress-Archive -Path dist\* -DestinationPath hitman-low-poly-windows-x86_64.zip -Force
+          $src = "dist\HITMAN Coral Palm Resort"
+          $test = Join-Path $env:RUNNER_TEMP "relocated\HITMAN Coral Palm Resort"
+          New-Item -ItemType Directory -Path (Split-Path $test) -Force | Out-Null
+          Copy-Item $src $test -Recurse
+          Write-Host "Launching from $test"
+          $env:HITMAN_SMOKE_FRAMES = "180"
+          $env:RUST_LOG = "info"
+          $exe = Join-Path $test "HITMAN Coral Palm Resort.exe"
+          $p = Start-Process -FilePath $exe -WorkingDirectory $test -PassThru `
+                 -RedirectStandardOutput "$env:RUNNER_TEMP\out.log" `
+                 -RedirectStandardError  "$env:RUNNER_TEMP\err.log"
+          if (-not $p.WaitForExit(300000)) { $p.Kill(); throw "packaged build did not exit" }
+          $code = $p.ExitCode
+          Get-Content "$env:RUNNER_TEMP\out.log","$env:RUNNER_TEMP\err.log" -ErrorAction SilentlyContinue |
+            Select-Object -Last 60
+          Write-Host "exit code: $code"
+          if ($code -ne 0) { throw "packaged build exited with $code" }
+          # A missing-asset build still starts, so assert the level actually loaded.
+          $log = (Get-Content "$env:RUNNER_TEMP\out.log","$env:RUNNER_TEMP\err.log" -Raw -ErrorAction SilentlyContinue)
+          if ($log -notmatch "SMOKE OK") { throw "packaged build did not report SMOKE OK" }
+          if ($log -match "Path not found") { throw "packaged build could not find its assets" }
+          Write-Host "Packaged build OK"
+
+      - name: Verify the distribution layout
+        shell: pwsh
+        run: |
+          $app = "dist\HITMAN Coral Palm Resort"
+          $required = @(
+            "$app\HITMAN Coral Palm Resort.exe",
+            "$app\assets\textures\marble_basecolor.png",
+            "$app\assets\shaders\water.wgsl",
+            "$app\README.txt"
+          )
+          foreach ($f in $required) {
+            if (-not (Test-Path $f)) { throw "missing from distribution: $f" }
+          }
+          $textures = (Get-ChildItem "$app\assets\textures" -Filter *.png).Count
+          Write-Host "$textures texture maps shipped"
+          if ($textures -lt 70) { throw "texture set is incomplete ($textures files)" }
+          Get-ChildItem $app -Recurse | Measure-Object Length -Sum |
+            ForEach-Object { Write-Host ("total size: {0:N1} MB" -f ($_.Sum / 1MB)) }
+
       - uses: actions/upload-artifact@v4
         with:
-          name: hitman-low-poly-windows-x86_64
-          path: hitman-low-poly-windows-x86_64.zip
+          name: HITMAN-Coral-Palm-Resort-windows-x86_64
+          path: dist/HITMAN Coral Palm Resort-windows-x86_64.zip
           retention-days: 30
