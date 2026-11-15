@@ -143,6 +143,8 @@ jobs:
           # A handful of viewpoints used to verify the level visually. Each run
           # boots the real game, renders one frame and exits.
           mkdir -p shots
+          # Earlier steps only type-check the crate; the capture runs the game.
+          cargo build --bin hitman_lowpoly
           { ldconfig -p | grep -i xkbcommon; ls -l /usr/lib/x86_64-linux-gnu/libxkbcommon*; } > shots/diag.txt 2>&1 || true
           cat shots/diag.txt || true
           capture() {
