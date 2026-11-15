@@ -40,8 +40,8 @@ impl Plugin for WorldPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<GraphicsSettings>()
             .init_resource::<PlayerZone>()
+            .init_resource::<water::WaterClock>()
             .add_plugins(WaterPlugin)
-            .add_systems(PreStartup, water::plugin)
             .add_systems(PreStartup, (load_material_library, setup_world).chain())
             .add_systems(
                 Startup,
@@ -56,10 +56,7 @@ impl Plugin for WorldPlugin {
             )
             .add_systems(
                 Update,
-                (
-                    environment::apply_shadow_settings,
-                    water::animate_water,
-                ),
+                (environment::apply_shadow_settings, water::animate_water),
             );
     }
 }
