@@ -137,6 +137,78 @@ pub fn build() -> ResortLayout {
         b.detail(Vec3::new(28.7, 7.0, z), Vec3::new(0.06, 1.9, 2.2), MatId::Glass);
     }
 
+    // --- Facade articulation ------------------------------------------
+    // A 30 m tall blank box reads as a slab, not a hotel. These bands, piers,
+    // cornices and balconies are what give the building its scale from outside,
+    // and each floor gets its own window rhythm.
+    //
+    // Floor plate / string course at each storey line.
+    for (y, thick) in [
+        (LOBBY_CEILING, 0.45_f32),
+        (UPPER_CEILING, 0.55),
+        (UPPER_CEILING + 3.6, 0.35),
+    ] {
+        b.slab("Facade Band S", Vec2::new(-29.6, -14.7), Vec2::new(29.6, -14.0), y - thick, y, MatId::Travertine);
+        b.slab("Facade Band N", Vec2::new(-29.6, 26.0), Vec2::new(29.6, 26.7), y - thick, y, MatId::Travertine);
+        b.slab("Facade Band W", Vec2::new(-29.7, -14.7), Vec2::new(-29.0, 26.7), y - thick, y, MatId::Travertine);
+        b.slab("Facade Band E", Vec2::new(29.0, -14.7), Vec2::new(29.7, 26.7), y - thick, y, MatId::Travertine);
+    }
+    // Vertical piers divide the facade into bays.
+    for z in [-14.0_f32, -8.0, -2.0, 4.0, 10.0, 16.0, 22.0, 26.0] {
+        for x in [-29.35_f32, 29.35] {
+            b.slab("Facade Pier", Vec2::new(x - 0.28, z - 0.28), Vec2::new(x + 0.28, z + 0.28), 0.0, UPPER_CEILING + 0.4, MatId::Limestone);
+        }
+    }
+    for x in [-29.0_f32, -22.0, -15.0, -8.0, 8.0, 15.0, 22.0, 29.0] {
+        for z in [-14.35_f32, 26.35] {
+            b.slab("Facade Pier", Vec2::new(x - 0.28, z - 0.28), Vec2::new(x + 0.28, z + 0.28), 0.0, UPPER_CEILING + 0.4, MatId::Limestone);
+        }
+    }
+    // Ground-floor arcade: deep reveals that cast their own shadow, with
+    // balconies above so the upper storey is not a flat plane.
+    for x in [-25.0_f32, -18.5, -12.0, 12.0, 18.5, 25.0] {
+        b.slab("Arcade Reveal", Vec2::new(x - 2.2, -14.4), Vec2::new(x + 2.2, -14.05), 0.0, 4.4, MatId::StoneWall);
+        b.detail(Vec3::new(x, 2.3, -14.15), Vec3::new(3.4, 3.4, 0.12), MatId::DarkTrim);
+        b.slab("Arcade Balcony", Vec2::new(x - 2.6, -15.6), Vec2::new(x + 2.6, -14.0), 4.4, 4.75, MatId::Travertine);
+        b.slab("Balcony Rail", Vec2::new(x - 2.6, -15.75), Vec2::new(x + 2.6, -15.55), 4.75, 5.85, MatId::Glass);
+        b.slab("Balcony Rail Cap", Vec2::new(x - 2.7, -15.8), Vec2::new(x + 2.7, -15.5), 5.85, 5.95, MatId::Brass);
+    }
+    // Upper storey windows on the south facade, evenly spaced.
+    for x in [-25.0_f32, -18.5, -12.0, -5.5, 5.5, 12.0, 18.5, 25.0] {
+        b.detail(Vec3::new(x, 6.9, -13.85), Vec3::new(2.4, 2.0, 0.08), MatId::Glass);
+        b.detail(Vec3::new(x, 5.85, -13.8), Vec3::new(2.6, 0.12, 0.16), MatId::StoneWall);
+        // Shade shutter: a thin projection that gives the window depth.
+        b.slab("Shutter", Vec2::new(x - 1.25, -14.3), Vec2::new(x + 1.25, -13.9), 7.95, 8.15, MatId::Wood);
+    }
+    // Roof cornice.
+    b.slab("Roof Cornice S", Vec2::new(-30.0, -15.0), Vec2::new(30.0, -13.9), UPPER_CEILING - 0.1, UPPER_CEILING + 0.35, MatId::Travertine);
+    b.slab("Roof Cornice N", Vec2::new(-30.0, 25.9), Vec2::new(30.0, 27.0), UPPER_CEILING - 0.1, UPPER_CEILING + 0.35, MatId::Travertine);
+    b.slab("Roof Cornice W", Vec2::new(-30.0, -15.0), Vec2::new(-28.9, 27.0), UPPER_CEILING - 0.1, UPPER_CEILING + 0.35, MatId::Travertine);
+    b.slab("Roof Cornice E", Vec2::new(28.9, -15.0), Vec2::new(30.0, 27.0), UPPER_CEILING - 0.1, UPPER_CEILING + 0.35, MatId::Travertine);
+    // Entrance canopy over the guest doors.
+    b.slab("Entrance Canopy", Vec2::new(-5.0, -16.6), Vec2::new(5.0, -14.0), 5.4, 5.75, MatId::Travertine);
+    b.detail(Vec3::new(0.0, 5.35, -15.3), Vec3::new(10.0, 0.1, 2.6), MatId::Wood);
+    for x in [-4.2_f32, 4.2] {
+        b.slab("Canopy Post", Vec2::new(x - 0.12, -16.4), Vec2::new(x + 0.12, -16.16), 0.0, 5.4, MatId::Brass);
+    }
+
+    // --- Interior lighting --------------------------------------------
+    // A sunlit lobby needs real light sources, not just an emissive panel: the
+    // sun cannot reach the middle of the floor plate, so without these the
+    // interior renders as a grey void. Point lights are deliberately few and
+    // shadowless — they are fill, and the sun carries the shadowing.
+    for (x, z) in [(-7.0_f32, -6.0_f32), (7.0, -6.0), (0.0, 2.0), (-7.0, 8.0), (7.0, 8.0)] {
+        b.light(
+            Vec3::new(x, LOBBY_CEILING - 0.35, z),
+            Color::srgb(1.0, 0.90, 0.74),
+            9_000.0,
+            14.0,
+        );
+    }
+    // Reception accent and the mezzanine wash.
+    b.light(Vec3::new(-5.0, 2.4, 7.0), Color::srgb(1.0, 0.88, 0.70), 4_500.0, 7.0);
+    b.light(Vec3::new(0.0, LOBBY_CEILING - 0.4, 16.5), Color::srgb(1.0, 0.93, 0.80), 5_000.0, 10.0);
+
     // --- Interior: lobby shell, mezzanine, reception -------------------
     // Double-height lobby in the centre; side wings are enclosed rooms.
     b.slab("Lobby Inner Wall W", Vec2::new(-12.0, -10.0), Vec2::new(-11.4, 22.0), 0.0, LOBBY_CEILING, MatId::Plaster);
@@ -251,6 +323,12 @@ pub fn build() -> ResortLayout {
     // RESTAURANT TERRACE: raised 2.4 m, east of the hotel, sea view
     // =======================================================================
     let deck = RESTAURANT_DECK;
+    // Restaurant lighting: warm pendants over the tables, and a cooler strip
+    // over the open kitchen so the two zones read differently.
+    for (x, z) in [(36.0_f32, -6.0_f32), (36.0, 2.0), (44.0, -2.0), (50.0, 6.0)] {
+        b.light(Vec3::new(x, deck + 3.0, z), Color::srgb(1.0, 0.86, 0.66), 5_500.0, 11.0);
+    }
+    b.light(Vec3::new(51.0, deck + 2.6, 10.0), Color::srgb(0.90, 0.95, 1.0), 6_000.0, 9.0);
     b.slab("Restaurant Deck", Vec2::new(31.0, -14.0), Vec2::new(58.0, 14.0), deck - 0.4, deck, MatId::Wood);
     floors.push(crate::core::Block2::new(
         Vec3::new(44.5, deck - 0.2, 0.0),
@@ -591,7 +669,18 @@ pub fn build() -> ResortLayout {
     // PENTHOUSE (restricted): the target's terrace, suite and hot tub
     // =======================================================================
     let pent = PENTHOUSE_Y;
-    b.slab("Penthouse Terrace", Vec2::new(-18.0, 27.0), Vec2::new(18.0, 50.0), pent - 0.35, pent, MatId::Marble);
+    // Restricted-floor lighting: warm, low, and only where people stand.
+    b.light(Vec3::new(0.0, pent + 3.4, 40.0), Color::srgb(1.0, 0.88, 0.70), 3_200.0, 9.0);
+    b.light(Vec3::new(12.0, pent + 2.0, 33.0), Color::srgb(0.95, 0.75, 0.55), 2_000.0, 6.0);
+    // The terrace continues the hotel's north face rather than floating: there
+    // is a solid mass below it from the roof deck up to the terrace slab.
+    b.slab("Penthouse Mass", Vec2::new(-18.0, 26.4), Vec2::new(18.0, 50.0), UPPER_CEILING + 0.4, pent - 0.35, MatId::Travertine);
+    b.slab("Penthouse Terrace", Vec2::new(-18.0, 26.4), Vec2::new(18.0, 50.0), pent - 0.35, pent, MatId::Marble);
+    // Terrace edge detail so the 4 m face does not read as a blank wall.
+    for x in [-18.0_f32, -12.0, -6.0, 0.0, 6.0, 12.0, 18.0] {
+        b.slab("Penthouse Pilaster", Vec2::new(x - 0.22, 26.2), Vec2::new(x + 0.22, 26.7), UPPER_CEILING + 0.4, pent, MatId::Limestone);
+    }
+    b.slab("Penthouse Belt", Vec2::new(-18.2, 26.1), Vec2::new(18.2, 26.8), pent - 1.2, pent - 0.9, MatId::Limestone);
     floors.push(crate::core::Block2::new(
         Vec3::new(0.0, pent - 0.17, 38.5),
         Vec3::new(36.0, 0.35, 23.0),
@@ -620,16 +709,17 @@ pub fn build() -> ResortLayout {
     b.deco(DecoKind::PottedPlant, Vec3::new(16.0, pent, 28.5), 0.0, 1.2);
     b.deco(DecoKind::PottedPlant, Vec3::new(-16.5, pent, 48.0), 0.0, 1.0);
 
-    // External staircase: 72 solid columns (0.41 m risers) up the west face.
-    let stair_steps = 72;
-    let riser = pent / stair_steps as f32;
+    // External staircase up the west face: 40 solid steps to the terrace.
+    let stair_steps = 40;
+    let riser = (pent / stair_steps as f32).max(0.12);
+    let run = 19.2 / stair_steps as f32;
     for i in 0..stair_steps {
         let top = (i as f32 + 1.0) * riser;
-        let z0 = 28.0 + i as f32 * 0.28;
+        let z0 = 28.0 + i as f32 * run;
         b.slab(
             "Penthouse Stair",
             Vec2::new(-32.0, z0 - 0.01),
-            Vec2::new(-29.0, z0 + 0.31),
+            Vec2::new(-29.0, z0 + run + 0.02),
             -0.2,
             top,
             MatId::Limestone,
@@ -672,5 +762,6 @@ pub fn build() -> ResortLayout {
         floors,
         // On the marble forecourt, facing the lobby.
         player_spawn: Vec3::new(0.0, 0.05, -17.5),
+        lights: b.lights,
     }
 }

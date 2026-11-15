@@ -47,7 +47,7 @@ impl Plugin for WorldPlugin {
                 Startup,
                 (
                     environment::setup_environment,
-                    environment::apply_sky_environment,
+                    environment::build_sky_images,
                     environment::apply_shadow_settings,
                 )
                     .chain()
@@ -55,7 +55,12 @@ impl Plugin for WorldPlugin {
             )
             .add_systems(
                 Update,
-                (environment::apply_shadow_settings, water::animate_water),
+                (
+                    environment::apply_shadow_settings,
+                    environment::apply_post_processing,
+                    environment::apply_sky_environment,
+                    water::animate_water,
+                ),
             );
     }
 }
@@ -80,12 +85,31 @@ fn setup_world(
     if let Some(library) = library.as_deref() {
         builder::spawn_level(&mut commands, &mut meshes, &layout, library);
     }
+    // Interior light sources. Shadowless on purpose: they are fill light for
+    // rooms the sun cannot reach, and shadow-map budget is better spent on the
+    // sun's cascades. `illuminance` is lux at one metre, so it is scaled from
+    // luminous power to stay comparable with the 82,000 lux sun.
+    for light in &layout.lights {
+        commands.spawn((
+            LevelEntity,
+            Name::new("Interior Light"),
+            PointLight {
+                color: light.color,
+                intensity: light.lumens,
+                range: light.range,
+                shadows_enabled: false,
+                ..default()
+            },
+            Transform::from_translation(light.position),
+        ));
+    }
     commands.insert_resource(WorldCollision::from_layout(&layout));
     info!(
-        "Loaded map '{}' with {} solids and {} props",
+        "Loaded map '{}' with {} solids, {} props and {} lights",
         layout.name,
         layout.solids.len(),
-        layout.deco.len()
+        layout.deco.len(),
+        layout.lights.len()
     );
     commands.insert_resource(ActiveMap { layout });
 }

@@ -2,7 +2,7 @@
 //!
 //! The solver resolves the player's circle against the resort's axis aligned
 //! boxes, supports walking up and down steps, and keeps the character glued to
-//! the correct floor height (lobby = 0, restaurant deck = 2.4, penthouse = 29.8,
+//! the correct floor height (lobby = 0, restaurant deck = 2.4, penthouse = 13.4,
 //! service corridor = -3.4).
 
 use super::camera::CameraRig;

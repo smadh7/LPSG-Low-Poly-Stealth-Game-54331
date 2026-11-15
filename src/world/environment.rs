@@ -585,17 +585,15 @@ pub fn setup_environment(mut commands: Commands) {
     );
 }
 
-/// Build the sky images and hand them to the camera. Runs after `setup_environment`
-/// and after the camera exists.
-pub fn apply_sky_environment(
-    mut commands: Commands,
-    mut images: ResMut<Assets<Image>>,
-    settings: Res<GraphicsSettings>,
-    cameras: Query<Entity, With<Camera3d>>,
-) {
-    if cameras.is_empty() {
-        return;
-    }
+/// Build the sky images once and keep them for every camera that needs them.
+#[derive(Resource, Clone)]
+pub struct SkyAssets {
+    pub specular: Handle<Image>,
+    pub diffuse: Handle<Image>,
+}
+
+/// Generate the sky cubemaps. Runs at startup, before anything needs them.
+pub fn build_sky_images(mut commands: Commands, mut images: ResMut<Assets<Image>>) {
     // 128 per face is plenty for smooth reflections and costs ~1.5 MB.
     let specular = images.add(generate_environment_cubemap(128, &TROPICAL_AFTERNOON));
 
@@ -604,24 +602,41 @@ pub fn apply_sky_environment(
     blur_cubemap(&mut rough, 2, 2);
     let diffuse = images.add(rough);
 
-    for camera in &cameras {
-        // The visible sky is a real skybox pass: it is drawn at infinite depth,
-        // so it is never clipped by the far plane, and it costs one fullscreen
-        // draw with no geometry. A giant sky sphere (the previous approach) sat
-        // beyond the camera's far plane and was simply never rasterised.
-        commands.entity(camera).insert(Skybox {
-            image: specular.clone(),
-            brightness: SKY_BRIGHTNESS,
-            rotation: Quat::IDENTITY,
-        });
-        if settings.environment_lighting {
-            commands.entity(camera).insert(EnvironmentMapLight {
-                diffuse_map: diffuse.clone(),
-                specular_map: specular.clone(),
-                intensity: 15_000.0,
+    commands.insert_resource(SkyAssets { specular, diffuse });
+}
+
+/// Attach the sky to any camera that does not have it yet.
+///
+/// This runs every frame rather than once at startup: the player camera is
+/// spawned by the player plugin, whose startup ordering is independent, and a
+/// one-shot system that ran too early silently produced a black sky. The query
+/// is two components, so the cost is negligible.
+pub fn apply_sky_environment(
+    mut commands: Commands,
+    sky: Option<Res<SkyAssets>>,
+    settings: Res<GraphicsSettings>,
+    cameras: Query<(Entity, Option<&Skybox>), With<Camera3d>>,
+) {
+    let Some(sky) = sky else { return };
+    for (camera, existing) in &cameras {
+        // The visible sky is a real skybox pass: drawn at infinite depth, so it
+        // is never clipped by the far plane, and it costs one fullscreen draw
+        // with no geometry.
+        if existing.is_none() {
+            commands.entity(camera).insert(Skybox {
+                image: sky.specular.clone(),
+                brightness: SKY_BRIGHTNESS,
                 rotation: Quat::IDENTITY,
-                affects_lightmapped_mesh_diffuse: true,
             });
+            if settings.environment_lighting {
+                commands.entity(camera).insert(EnvironmentMapLight {
+                    diffuse_map: sky.diffuse.clone(),
+                    specular_map: sky.specular.clone(),
+                    intensity: 15_000.0,
+                    rotation: Quat::IDENTITY,
+                    affects_lightmapped_mesh_diffuse: true,
+                });
+            }
         }
     }
 }

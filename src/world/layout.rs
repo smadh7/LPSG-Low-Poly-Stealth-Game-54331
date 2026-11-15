@@ -24,7 +24,12 @@ pub const GROUND_Y: f32 = 0.0;
 pub const LOBBY_CEILING: f32 = 4.6;
 pub const UPPER_CEILING: f32 = 9.0;
 pub const RESTAURANT_DECK: f32 = 2.4;
-pub const PENTHOUSE_Y: f32 = 29.8;
+/// Height of the penthouse terrace floor.
+///
+/// It sits one storey above the hotel roof deck (which tops out at 9.4 m) with
+/// the floor slab visible below it, so the building reads as one structure. At
+/// its previous value the terrace floated 20 m in the air.
+pub const PENTHOUSE_Y: f32 = 13.4;
 pub const SERVICE_Y: f32 = -3.4;
 
 /// Timeless resort palette (approximate sRGB; textures carry the detail).
@@ -197,6 +202,19 @@ pub struct ResortLayout {
     pub floors: Vec<Block2>,
     /// Player spawn point.
     pub player_spawn: Vec3,
+    /// Interior light sources: position, colour, luminous power and range.
+    pub lights: Vec<LightSpec>,
+}
+
+/// An interior light placed by the layout.
+#[derive(Clone, Debug)]
+pub struct LightSpec {
+    pub position: Vec3,
+    pub color: Color,
+    /// Luminous power in lumens.
+    pub lumens: f32,
+    /// Cutoff distance in metres.
+    pub range: f32,
 }
 
 impl ResortLayout {
@@ -242,6 +260,8 @@ pub struct LayoutBuilder {
     pub doors: Vec<DoorSpec>,
     /// Non-colliding interior detail (rugs, ceiling panels, glass).
     pub details: Vec<InteriorDetail>,
+    /// Interior light placements.
+    pub lights: Vec<LightSpec>,
 }
 
 impl Default for LayoutBuilder {
@@ -257,6 +277,7 @@ impl LayoutBuilder {
             deco: Vec::new(),
             doors: Vec::new(),
             details: Vec::new(),
+            lights: Vec::new(),
         }
     }
 
@@ -354,6 +375,17 @@ impl LayoutBuilder {
         if opening_top < height - 0.02 {
             piece(name, open_lo, open_hi, opening_top, height);
         }
+    }
+
+    /// Place an interior light. `lumens` is luminous power; `range` is the
+    /// distance at which it fades out.
+    pub fn light(&mut self, position: Vec3, color: Color, lumens: f32, range: f32) {
+        self.lights.push(LightSpec {
+            position,
+            color,
+            lumens,
+            range,
+        });
     }
 
     /// Non-colliding detail geometry (glazing, rugs, ceiling light panels).

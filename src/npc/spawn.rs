@@ -130,14 +130,14 @@ fn npc_specs() -> Vec<NpcSpec> {
             .stop(Vec3::new(36.0, 0.1, 18.0), 9.0, "checking the staff room"),
         // --- Terrace / penthouse approach --------------------------------
         NpcSpec::new("Guard: Petra", NpcRole::SecurityGuard, ZoneId::Penthouse, 1.0)
-            .stop(Vec3::new(-24.0, 29.8, 46.0), 14.0, "patrolling the stair landing")
-            .stop(Vec3::new(0.0, 29.8, 30.0), 10.0, "guarding the terrace doors")
-            .stop(Vec3::new(14.0, 29.8, 44.0), 12.0, "checking the balcony"),
+            .stop(Vec3::new(-24.0, 13.4, 46.0), 14.0, "patrolling the stair landing")
+            .stop(Vec3::new(0.0, 13.4, 30.0), 10.0, "guarding the terrace doors")
+            .stop(Vec3::new(14.0, 13.4, 44.0), 12.0, "checking the balcony"),
         // --- The target --------------------------------------------------
         NpcSpec::new("Target: Lady Voss", NpcRole::Target, ZoneId::Penthouse, 0.9)
-            .stop(Vec3::new(0.0, 29.8, 38.0), 20.0, "hosting a private meeting")
-            .stop(Vec3::new(-12.0, 29.8, 30.0), 10.0, "looking over the resort")
-            .stop(Vec3::new(12.0, 29.8, 33.0), 12.0, "conferring with security"),
+            .stop(Vec3::new(0.0, 13.4, 38.0), 20.0, "hosting a private meeting")
+            .stop(Vec3::new(-12.0, 13.4, 30.0), 10.0, "looking over the resort")
+            .stop(Vec3::new(12.0, 13.4, 33.0), 12.0, "conferring with security"),
     ]
 }
 

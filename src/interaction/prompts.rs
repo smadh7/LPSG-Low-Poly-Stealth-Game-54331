@@ -379,7 +379,7 @@ pub fn spawn_interactables(
                 ),
                 ZoneId::Penthouse,
             ),
-            position: Vec3::new(6.2, 31.4, 44.2),
+            position: Vec3::new(6.2, 15.0, 44.2),
             material: 2,
         },
         Entry {
@@ -392,7 +392,7 @@ pub fn spawn_interactables(
                 ),
                 ZoneId::Penthouse,
             ),
-            position: Vec3::new(12.0, 30.9, 33.0),
+            position: Vec3::new(12.0, 14.5, 33.0),
             material: 1,
         },
         Entry {

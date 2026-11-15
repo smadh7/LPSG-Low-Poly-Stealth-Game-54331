@@ -195,7 +195,7 @@ fn player_can_descend_into_the_service_corridor() {
 
 #[test]
 fn player_can_climb_the_penthouse_stair() {
-    // The restricted penthouse is 29.8 m up a 72-step staircase.
+    // The restricted penthouse is 13.4 m up the external staircase.
     let mut app = physics_app(Vec3::new(-30.5, 0.0, 24.0));
     app.add_systems(FixedUpdate, hitman_lowpoly::player::movement::player_physics);
     // Only walk as far as the terrace: the test asserts the climb, and the
@@ -207,7 +207,7 @@ fn player_can_climb_the_penthouse_stair() {
         highest = highest.max(player_transform(&mut app).y);
     }
     assert!(
-        highest > 25.0,
+        highest > 12.5,
         "player should climb towards the penthouse terrace, highest y={highest}"
     );
 }
@@ -319,8 +319,8 @@ fn every_interactable_sits_on_or_near_a_surface() {
         (Vec3::new(-8.0, 0.95, -20.4), "garden bench"),
         (Vec3::new(36.0, 3.4, -8.0), "restaurant menu"),
         (Vec3::new(-46.3, -1.2, 13.0), "staff locker"),
-        (Vec3::new(6.2, 31.4, 44.2), "penthouse safe"),
-        (Vec3::new(12.0, 30.9, 33.0), "hot tub dataslate"),
+        (Vec3::new(6.2, 15.0, 44.2), "penthouse safe"),
+        (Vec3::new(12.0, 14.5, 33.0), "hot tub dataslate"),
     ];
     for (position, what) in checks {
         let xz = Vec2::new(position.x, position.z);
