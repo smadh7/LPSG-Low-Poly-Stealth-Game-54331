@@ -4,7 +4,7 @@
 //! minimal Bevy app so movement, collision, NPC routines and interaction are
 //! verified by machinery, not by eye.
 
-use bevy::prelude::*;
+use bevy::{prelude::*, time::TimeUpdateStrategy};
 use hitman_lowpoly::core::Circle2;
 use hitman_lowpoly::interaction::actions::NoticeFeed;
 use hitman_lowpoly::interaction::{FocusTarget, InteractAction, InteractKind, Interactable};
@@ -37,14 +37,9 @@ fn player_body(app: &mut App) -> ActorBody {
 /// The headless app does not advance real time, so driving `FixedUpdate`
 /// directly makes the simulation deterministic and fast.
 fn step(app: &mut App, frames: usize) {
-    // `app.update()` runs the fixed-timestep loop; with our fixed clock set to
-    // 1/60 s and real time advanced by the same amount, each call runs exactly
-    // one `FixedUpdate`, which keeps the simulation deterministic and fast.
-    let step = std::time::Duration::from_secs_f64(1.0 / 60.0);
+    // Bevy's own test recipe: drive real time manually so each `update()` is
+    // exactly one fixed timestep. Deterministic and instant.
     for _ in 0..frames {
-        app.world_mut()
-            .resource_mut::<Time<Virtual>>()
-            .advance_by(step);
         app.update();
     }
 }
@@ -58,7 +53,10 @@ fn physics_app(spawn: Vec3) -> App {
     app.add_plugins(MinimalPlugins)
         .insert_resource(Time::<Fixed>::from_hz(60.0))
         .insert_resource(PendingPlayerSpawn { position: spawn })
-        .insert_resource(Time::<Fixed>::from_hz(60.0));
+        .insert_resource(Time::<Fixed>::from_hz(60.0))
+        .insert_resource(TimeUpdateStrategy::ManualDuration(
+            std::time::Duration::from_secs_f64(1.0 / 60.0),
+        ));
     app.add_systems(Startup, spawn_test_player);
     app.update();
     app.init_resource::<PlayerIntent>();
