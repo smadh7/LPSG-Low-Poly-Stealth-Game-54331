@@ -65,6 +65,12 @@ impl Plugin for PlayerPlugin {
                 )
                     .chain(),
             )
+            .add_systems(
+                Update,
+                // Runs after movement so it sees the zone the player just
+                // entered, not last frame's.
+                camera::eye_adaptation.after(movement::player_physics),
+            )
             .add_systems(FixedUpdate, movement::player_physics);
     }
 }

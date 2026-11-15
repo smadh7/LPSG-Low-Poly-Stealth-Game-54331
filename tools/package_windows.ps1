@@ -8,8 +8,6 @@
 # The folder is fully portable: it can be moved anywhere, needs no installer,
 # no admin rights, no Rust toolchain and no internet connection. Assets resolve
 # relative to the executable (see src/main.rs), so a double-click always works.
-#
-# Usage:  pwsh -File tools/package_windows.ps1 [-SkipBuild]
 
 param(
     [switch]$SkipBuild,
@@ -22,12 +20,12 @@ Set-Location $root
 
 $name = "HITMAN Coral Palm Resort"
 $dist = Join-Path $root "dist"
-$app  = Join-Path $dist $name
+$app = Join-Path $dist $name
 
 if (-not $SkipBuild) {
     Write-Host "Building ($Profile)..."
     cargo build --profile $Profile --bin hitman_lowpoly
-    if ($LASTEXITCODE -ne 0) { throw "cargo build failed" }
+    if ($LASTEXITCODE -ne 0) { throw "cargo build failed with $LASTEXITCODE" }
 }
 
 $exe = Join-Path $root "target\$Profile\hitman_lowpoly.exe"
@@ -36,17 +34,22 @@ if (-not (Test-Path $exe)) { throw "missing $exe" }
 if (Test-Path $app) { Remove-Item $app -Recurse -Force }
 New-Item -ItemType Directory -Path $app -Force | Out-Null
 
-Copy-Item $exe (Join-Path $app "HITMAN Coral Palm Resort.exe")
-Copy-Item (Join-Path $root "assets") (Join-Path $app "assets") -Recurse
-Copy-Item (Join-Path $PSScriptRoot "DISTRIBUTION_README.txt") (Join-Path $app "README.txt")
+Copy-Item -LiteralPath $exe -Destination (Join-Path $app "HITMAN Coral Palm Resort.exe")
+Copy-Item -Path (Join-Path $root "assets") -Destination (Join-Path $app "assets") -Recurse
+Copy-Item -LiteralPath (Join-Path $PSScriptRoot "DISTRIBUTION_README.txt") `
+          -Destination (Join-Path $app "README.txt")
 
-# Strip anything the game never reads at runtime so the download stays small.
-Get-ChildItem (Join-Path $app "assets") -Recurse -Include *.meta,*.txt.bak |
+# A shipped build has no .meta files; make sure none slipped in.
+Get-ChildItem -Path (Join-Path $app "assets") -Recurse -File |
+    Where-Object { $_.Extension -eq ".meta" } |
     Remove-Item -Force -ErrorAction SilentlyContinue
 
-$size = [math]::Round(((Get-ChildItem $app -Recurse | Measure-Object Length -Sum).Sum / 1MB), 1)
-Write-Host "Packaged $name ($size MB):"
-Get-ChildItem $app | Format-Table Name, Length
+$files = Get-ChildItem -Path $app -Recurse -File
+$mb = [math]::Round((($files | Measure-Object -Property Length -Sum).Sum / 1MB), 1)
+Write-Host "Packaged '$name': $($files.Count) files, $mb MB"
+Get-ChildItem -Path $app | Format-Table Name
 
-Compress-Archive -Path (Join-Path $app "*") -DestinationPath (Join-Path $dist "$name-windows-x86_64.zip") -Force
-Write-Host "Wrote dist\$name-windows-x86_64.zip"
+$zip = Join-Path $dist "$name-windows-x86_64.zip"
+if (Test-Path $zip) { Remove-Item $zip -Force }
+Compress-Archive -Path (Join-Path $app "*") -DestinationPath $zip -Force
+Write-Host "Wrote $zip"

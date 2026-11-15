@@ -32,6 +32,21 @@ pub enum ZoneId {
 }
 
 impl ZoneId {
+    /// Whether this zone is under a roof.
+    ///
+    /// Used for lighting: the camera adapts its exposure when the player steps
+    /// inside, the way a real camera (and every modern game) does.
+    pub fn is_interior(self) -> bool {
+        matches!(
+            self,
+            ZoneId::Lobby
+                | ZoneId::Restaurant
+                | ZoneId::ServiceCorridor
+                | ZoneId::SecurityWing
+                | ZoneId::Penthouse
+        )
+    }
+
     /// Human readable zone name used by the HUD.
     pub fn display_name(self) -> &'static str {
         match self {

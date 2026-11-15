@@ -262,6 +262,11 @@ fn capture_lock_camera(mut commands: Commands, queue: Option<Res<CaptureQueue>>)
     }
     if let Some(shot) = queue.current() {
         commands.insert_resource(CameraLock(shot.eye, shot.yaw, shot.pitch));
+        // Interior viewpoints need the adapted exposure, since no gameplay
+        // movement will trigger adaptation for them.
+        if shot.ev100.is_none() {
+            commands.remove_resource::<CaptureExposure>();
+        }
         if let Some(ev100) = shot.ev100 {
             commands.insert_resource(CaptureExposure(ev100));
         }

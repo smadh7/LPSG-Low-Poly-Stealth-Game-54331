@@ -9,6 +9,7 @@ use super::character::{ActorBody, PlayerAvatar};
 use super::{Stance, CROUCH_EYE_HEIGHT, EYE_HEIGHT};
 use crate::core::math::{smooth_vec3, yaw_to_dir};
 use crate::world::builder::WorldCollision;
+use bevy::render::camera::Exposure;
 use bevy::{input::mouse::AccumulatedMouseMotion, prelude::*, window::CursorGrabMode};
 use std::f32::consts::{FRAC_PI_2, FRAC_PI_3};
 
@@ -89,6 +90,55 @@ pub fn camera_look(
         .clamp(-FRAC_PI_3 - 0.15, FRAC_PI_2 - 0.35);
     rig.yaw = rig.yaw.rem_euclid(std::f32::consts::TAU);
     intent.look += delta;
+}
+
+/// Adaptation speed for eye adaptation, as a fraction of the remaining
+/// difference per second. Indoor/outdoor transitions settle in about a second.
+const ADAPT_RATE: f32 = 3.2;
+
+/// Eye adaptation.
+///
+/// The scene is lit physically: a sunlit facade is ~82,000 lux, a lobby lit by
+/// interior fixtures is a few hundred. A single fixed exposure cannot show both
+/// — outdoors would clip, indoors would be black. Real cameras and every modern
+/// game adapt, so this eases the exposure towards the value that suits the zone
+/// the player is standing in.
+pub fn eye_adaptation(
+    time: Res<Time>,
+    zone: Option<Res<crate::world::PlayerZone>>,
+    // A locked camera (screenshot harness, cutscenes) owns its exposure.
+    lock: Option<Res<CameraLock>>,
+    mut current: Local<Option<f32>>,
+    mut cameras: Query<&mut Exposure, With<ThirdPersonCamera>>,
+) {
+    if lock.is_some() {
+        return;
+    }
+    let interior = zone
+        .as_ref()
+        .and_then(|z| z.current)
+        .map(|z| z.is_interior())
+        .unwrap_or(false);
+    let target = if interior {
+        crate::world::environment::INTERIOR_EXPOSURE
+    } else {
+        crate::world::environment::EXPOSURE
+    };
+    let value = current.get_or_insert(target);
+    let dt = time.delta_secs().min(0.2);
+    let t = (*value - target).abs() * dt * ADAPT_RATE;
+    if (*value - target).abs() < 0.01 {
+        *value = target;
+    } else if *value < target {
+        *value += t.max(0.001);
+    } else {
+        *value -= t.max(0.001);
+    }
+    for mut exposure in &mut cameras {
+        if (exposure.ev100 - *value).abs() > 0.005 {
+            exposure.ev100 = *value;
+        }
+    }
 }
 
 /// Overrides the follow camera entirely.

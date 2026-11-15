@@ -58,6 +58,10 @@ pub const EXPOSURE: Exposure = Exposure { ev100: 13.6 };
 /// Sunlight on a clear tropical afternoon, in lux.
 pub const SUN_LUX: f32 = 82_000.0;
 
+/// Exposure used indoors, where the eye adapts to fixtures of a few hundred lux
+/// rather than an 82,000 lux sun. Roughly a 3.5 stop difference.
+pub const INTERIOR_EXPOSURE: Exposure = Exposure { ev100: 10.0 };
+
 /// Luminance of the sky, in cd/m², on a clear tropical afternoon.
 ///
 /// Every HDR quantity in the game is expressed in real units: the sun is 82,000
