@@ -68,7 +68,6 @@ impl NpcRole {
         matches!(self, NpcRole::SecurityGuard | NpcRole::Target | NpcRole::Manager)
     }
 
-    /// Primary body colours for the procedural model.
     /// Outfit used for this role.
     ///
     /// Staff wear the resort uniform (gold-accented linen for front of house,
@@ -132,7 +131,6 @@ impl NpcRole {
             NpcRole::SecurityGuard => Color::srgb(0.90, 0.35, 0.32),
             NpcRole::Target => Color::srgb(0.85, 0.30, 0.55),
         }
-    }
     }
 }
 
