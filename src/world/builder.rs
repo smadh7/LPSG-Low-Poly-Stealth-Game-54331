@@ -296,3 +296,14 @@ mod tests {
         assert_eq!(indices.len() % 3, 0, "triangle list must be complete");
     }
 }
+
+/// Convenience helpers used by diagnostics and tools.
+pub trait WorldCollisionExt {
+    fn surfaces(&self) -> &[Block2];
+}
+
+impl WorldCollisionExt for WorldCollision {
+    fn surfaces(&self) -> &[Block2] {
+        &self.surfaces
+    }
+}
