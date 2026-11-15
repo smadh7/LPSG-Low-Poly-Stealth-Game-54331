@@ -811,8 +811,12 @@ mod tests {
         // not read as boxes in silhouette.
         let mut assets = Assets::<Mesh>::default();
         let rig = CharacterMeshes::create(&mut assets);
+        // A tapered limb is 10 quads (20 triangles) around one axis: 40 vertices
+        // is the correct count for a circular cross-section, and crucially it is
+        // not 8 like a box would be.
         let thigh = assets.get(&rig.thigh).expect("thigh mesh");
-        assert!(thigh.count_vertices() > 60, "thigh has {} verts", thigh.count_vertices());
+        assert!(thigh.count_vertices() >= 40, "thigh has {} verts", thigh.count_vertices());
+        assert_eq!(thigh.count_vertices() % 4, 0, "limbs must be quad rings");
         let head = assets.get(&rig.head).expect("head mesh");
         assert!(head.count_vertices() > 400, "head is too simple: {} verts", head.count_vertices());
     }

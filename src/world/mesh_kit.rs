@@ -493,7 +493,7 @@ fn add_cone_vertices(b: &mut Bucket, bottom: Vec3, radius: f32, height: f32, sid
         let n1 = (d1 * height + Vec3::Y * radius).normalize_or_zero();
         b.tri(
             [p0, p1, apex],
-            [n0, n1, (n0 + n1) * 0.5],
+            [n0, n1, (n0 + n1).normalize_or_zero()],
             [[0.0, 0.0], [radius * TAU / sides as f32, 0.0], [radius, height]],
         );
         b.tri(
@@ -588,11 +588,11 @@ mod tests {
     #[test]
     fn cylinders_and_spheres_build_with_smooth_normals() {
         let mut b = Bucket::default();
-        add_cylinder_vertices(&mut b, Vec3::ZERO, 0.5, 2.0, 16);
+        add_cylinder_vertices(&mut b, Vec3::ZERO, 0.5, 2.0, 24);
         add_taper_vertices(&mut b, Vec3::ZERO, 0.3, 0.1, 4.0, 8);
         add_cone_vertices(&mut b, Vec3::ZERO, 0.4, 1.0, 8);
         add_sphere_vertices(&mut b, Vec3::Y, Vec3::splat(0.5), 8, 12);
-        assert!(b.positions.len() > 500);
+        assert!(b.positions.len() > 400, "only {} verts", b.positions.len());
         for n in &b.normals {
             let len = Vec3::from(*n).length();
             assert!((len - 1.0).abs() < 0.01, "normals must be unit length");

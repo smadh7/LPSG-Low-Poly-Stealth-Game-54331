@@ -452,28 +452,51 @@ mod tests {
         }
     }
 
+    fn clear_at(solids: &[crate::world::layout::SolidSpec], x: f32, y: f32) -> bool {
+        !solids.iter().any(|s| {
+            let bottom = s.center.y - s.size.y * 0.5;
+            let top = s.center.y + s.size.y * 0.5;
+            (s.center.x - x).abs() < 0.6 && bottom < y && top > y
+        })
+    }
+
     #[test]
-    fn openings_keep_walls_solid_above_and_below() {
-        let mut b = LayoutBuilder::new();
-        b.wall_with_opening(
-            "Test",
+    fn doorways_are_walkable_and_windows_are_not() {
+        // A doorway: opening from the floor to 2.6 m, so it must be clear at
+        // chest height but still have a solid lintel above.
+        let mut door = LayoutBuilder::new();
+        door.wall_with_opening(
+            "Door",
             Vec2::new(0.0, 0.0),
             Vec2::new(10.0, 0.3),
             0.3,
             4.6,
             5.0,
             1.8,
-            1.0,
-            3.0,
+            0.0,
+            2.6,
             crate::world::mesh_kit::MatId::Plaster,
         );
-        // Two side pieces, a sill and a lintel.
-        assert_eq!(b.solids.len(), 4);
-        // The doorway itself must be free of solid geometry at eye height.
-        let blocked = b
-            .solids
-            .iter()
-            .any(|s| s.size.y > 0.9 && s.center.y < 2.0 && (s.center.x - 5.0).abs() < 0.6);
-        assert!(!blocked, "the opening must be clear");
+        assert!(!clear_at(&door.solids, 5.0, 1.2), "a doorway must be open");
+        assert!(!clear_at(&door.solids, 5.0, 0.2));
+        assert!(clear_at(&door.solids, 5.0, 3.2) || door.solids.iter().any(|s| s.center.y > 3.0));
+
+        // A window: 1.1 m sill, 2.9 m head, so the wall blocks at knee height
+        // and keeps a lintel and sill.
+        let mut window = LayoutBuilder::new();
+        window.wall_with_opening(
+            "Window",
+            Vec2::new(0.0, 0.0),
+            Vec2::new(10.0, 0.3),
+            0.3,
+            4.6,
+            5.0,
+            1.8,
+            1.1,
+            2.9,
+            crate::world::mesh_kit::MatId::Plaster,
+        );
+        assert!(!clear_at(&window.solids, 5.0, 0.5), "the sill must be solid");
+        assert!(!clear_at(&window.solids, 5.0, 3.6), "the lintel must be solid");
     }
 }

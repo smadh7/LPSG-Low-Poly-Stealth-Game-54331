@@ -447,8 +447,8 @@ pub fn build() -> ResortLayout {
     // SITE BOUNDARY: retaining wall + planting, so the map never looks cut off
     // =======================================================================
     let bound = 73.0;
-    b.wall("Boundary W", Vec2::new(-bound, -62.0), Vec2::new(-bound, 64.0), 1.6, MatId::StoneWall);
-    b.wall("Boundary E", Vec2::new(bound, -62.0), Vec2::new(bound, 64.0), 1.6, MatId::StoneWall);
+    b.wall("Boundary W", Vec2::new(-bound, -62.0), Vec2::new(-bound + 0.7, 64.0), 1.6, MatId::StoneWall);
+    b.wall("Boundary E", Vec2::new(bound - 0.7, -62.0), Vec2::new(bound, 64.0), 1.6, MatId::StoneWall);
     b.wall("Boundary N", Vec2::new(-bound, 63.0), Vec2::new(bound, 64.0), 1.6, MatId::StoneWall);
     for i in 0..16 {
         let t = i as f32 / 15.0;

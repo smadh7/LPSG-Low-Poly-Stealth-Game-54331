@@ -378,6 +378,18 @@ pub fn parasol(m: &mut MeshBuilder, origin: Vec3, _yaw: f32, scale: f32) {
 pub fn umbrella(m: &mut MeshBuilder, origin: Vec3, yaw: f32, scale: f32) {
     let h = 2.5 * scale;
     m.add_cylinder(MatId::Wood, origin, 0.05, h, 8);
+    // Weighted base and a hanging valance, so it reads as furniture not a cone.
+    m.add_cylinder(MatId::Concrete, origin, 0.30 * scale, 0.16 * scale, 12);
+    for i in 0..8 {
+        let a0 = yaw + i as f32 * TAU / 8.0;
+        let a1 = a0 + TAU / 16.0;
+        let rim = 1.9 * scale;
+        let mid0 = origin + Vec3::Y * (h - 0.52) + Vec3::new(a0.cos() * rim, 0.0, a0.sin() * rim);
+        let mid1 = origin + Vec3::Y * (h - 0.52) + Vec3::new(a1.cos() * rim, 0.0, a1.sin() * rim);
+        let low0 = mid0 - Vec3::Y * 0.18;
+        let low1 = mid1 - Vec3::Y * 0.18;
+        m.add_quad(if i % 2 == 0 { MatId::WhitePaint } else { MatId::Fabric }, [mid0, mid1, low1, low0]);
+    }
     for i in 0..8 {
         let a0 = yaw + i as f32 * TAU / 8.0;
         let a1 = a0 + TAU / 8.0;
