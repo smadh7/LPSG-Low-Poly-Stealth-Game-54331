@@ -32,9 +32,12 @@ pub fn build() -> ResortLayout {
             Vec3::new(max.x - min.x, top + 2.0, max.y - min.y),
         )
     };
-    floors.push(plate(Vec2::new(-74.0, -34.0), Vec2::new(74.0, 62.0), 0.0));
-    floors.push(plate(Vec2::new(-74.0, -31.0), Vec2::new(-62.6, 22.6), -3.4));
-    floors.push(plate(Vec2::new(-29.0, -31.0), Vec2::new(74.0, 22.6), 0.0));
+    // Four plates leave a genuine opening over the below-ground level
+    // (x -62.6..-29, z -31..22.6) instead of placing invisible floor above it.
+    floors.push(plate(Vec2::new(-29.0, -34.0), Vec2::new(74.0, 62.0), 0.0)); // east
+    floors.push(plate(Vec2::new(-74.0, -34.0), Vec2::new(-62.6, 62.0), 0.0)); // west
+    floors.push(plate(Vec2::new(-62.6, -34.0), Vec2::new(-29.0, -31.0), 0.0)); // south lip
+    floors.push(plate(Vec2::new(-62.6, 22.6), Vec2::new(-29.0, 62.0), 0.0)); // north lip
 
     // Beach slopes gently into the lagoon (south).
     b.slab("Beach", Vec2::new(-74.0, -62.0), Vec2::new(74.0, -34.0), -2.4, 0.0, MatId::Sand);
@@ -256,6 +259,34 @@ pub fn build() -> ResortLayout {
     // Retaining wall around the deck (stone, walkable top not needed).
     b.slab("Deck Retaining S", Vec2::new(31.0, -14.4), Vec2::new(58.0, -14.0), -0.2, deck, MatId::StoneWall);
     b.slab("Deck Retaining E", Vec2::new(58.0, -14.4), Vec2::new(58.4, 14.0), -0.2, deck, MatId::StoneWall);
+    // Grand staircase from the gardens up to the deck's south face: 24 shallow
+    // steps (0.1 m risers) so it is comfortably walkable.
+    for i in 0..24 {
+        let top = (i as f32 + 1.0) * (deck / 24.0);
+        let z0 = -19.0 + i as f32 * 0.2;
+        b.slab(
+            "Restaurant Stair",
+            Vec2::new(33.0, z0 - 0.01),
+            Vec2::new(36.0, z0 + 0.31),
+            -0.3,
+            top,
+            MatId::Limestone,
+        );
+    }
+    // Cheek walls either side of the stair.
+    for x in [32.4_f32, 36.6] {
+        b.slab(
+            "Restaurant Stair Cheek",
+            Vec2::new(x, -19.2),
+            Vec2::new(x + 0.6, -14.0),
+            -0.3,
+            deck + 0.9,
+            MatId::StoneWall,
+        );
+    }
+    // Landing at the top so the step onto the deck is level.
+    b.slab("Restaurant Stair Landing", Vec2::new(33.0, -14.0), Vec2::new(36.0, -13.2), -0.3, deck, MatId::Limestone);
+
     // Balustrade along the east and south edges (stone posts + rail).
     for i in 0..9 {
         let z = -13.0 + i as f32 * 3.4;
