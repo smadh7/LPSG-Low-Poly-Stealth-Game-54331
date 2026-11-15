@@ -202,7 +202,7 @@ pub fn dining_set(m: &mut MeshBuilder, origin: Vec3, yaw: f32, _scale: f32) {
         let a = yaw + i as f32 * FRAC_PI_2;
         let offset = Vec3::new(0.95, 0.0, 0.0);
         let pos = place(origin, a, offset);
-        chair(m, pos, a + PI, MatId::Wood, MatId::Cushion);
+        chair(m, pos, a + PI, MatId::Wood, MatId::Fabric);
     }
     // Table settings: plate, glass, candle.
     for sx in [-0.35_f32, 0.35] {
@@ -225,22 +225,22 @@ pub fn bar_set(m: &mut MeshBuilder, origin: Vec3, yaw: f32, _scale: f32) {
         let a = yaw + i as f32 * PI;
         let p = origin + Vec3::new(a.cos() * 0.75, 0.0, a.sin() * 0.75);
         m.add_cylinder(MatId::DarkTrim, p, 0.045, 0.72, 8);
-        m.add_cylinder(MatId::Cushion, p + Vec3::Y * 0.72, 0.20, 0.07, 12);
+        m.add_cylinder(MatId::Fabric, p + Vec3::Y * 0.72, 0.20, 0.07, 12);
     }
 }
 
 /// Lounge sofa / armchair.
 pub fn armchair(m: &mut MeshBuilder, origin: Vec3, yaw: f32, _scale: f32) {
     m.add_box_rotated(MatId::Wood, origin + Vec3::Y * 0.22, Vec3::new(1.0, 0.22, 0.9), yaw);
-    m.add_box_rotated(MatId::Cushion, origin + Vec3::Y * 0.44, Vec3::new(0.92, 0.20, 0.82), yaw);
-    m.add_box_rotated(MatId::Cushion, origin + Vec3::Y * 0.78, Vec3::new(0.92, 0.50, 0.20), yaw);
+    m.add_box_rotated(MatId::Fabric, origin + Vec3::Y * 0.44, Vec3::new(0.92, 0.20, 0.82), yaw);
+    m.add_box_rotated(MatId::Fabric, origin + Vec3::Y * 0.78, Vec3::new(0.92, 0.50, 0.20), yaw);
     for sx in [-1.0_f32, 1.0] {
-        m.add_box_rotated(MatId::Cushion, origin + Vec3::Y * 0.60 + Quat::from_rotation_y(yaw) * Vec3::new(sx * 0.48, 0.0, 0.0), Vec3::new(0.12, 0.34, 0.86), yaw);
+        m.add_box_rotated(MatId::Fabric, origin + Vec3::Y * 0.60 + Quat::from_rotation_y(yaw) * Vec3::new(sx * 0.48, 0.0, 0.0), Vec3::new(0.12, 0.34, 0.86), yaw);
     }
     // Cushions.
     for (sx, sz) in [(-0.3_f32, 0.0_f32), (0.3, 0.0)] {
         let p = origin + Quat::from_rotation_y(yaw) * Vec3::new(sx, 0.58, sz - 0.25);
-        m.add_box_rotated(MatId::Cushion, p, Vec3::new(0.36, 0.14, 0.34), yaw + 0.2);
+        m.add_box_rotated(MatId::Fabric, p, Vec3::new(0.36, 0.14, 0.34), yaw + 0.2);
     }
 }
 
@@ -259,7 +259,7 @@ pub fn bed(m: &mut MeshBuilder, origin: Vec3, yaw: f32, scale: f32) {
     }
     // Throw across the foot of the bed.
     let t = origin + Vec3::Y * 0.60 + Quat::from_rotation_y(yaw) * Vec3::new(0.0, 0.0, l * 0.22);
-    m.add_box_rotated(MatId::Cushion, t, Vec3::new(w * 0.98, 0.05, l * 0.34), yaw);
+    m.add_box_rotated(MatId::Fabric, t, Vec3::new(w * 0.98, 0.05, l * 0.34), yaw);
     // Legs.
     for (sx, sz) in [(-1.0_f32, -1.0_f32), (1.0, -1.0), (-1.0, 1.0), (1.0, 1.0)] {
         let p = origin + Quat::from_rotation_y(yaw) * Vec3::new(sx * w * 0.44, 0.05, sz * l * 0.44);
@@ -359,7 +359,7 @@ pub fn sun_lounger(m: &mut MeshBuilder, origin: Vec3, yaw: f32, _scale: f32) {
         }
     }
     // Towel.
-    m.add_box_rotated(MatId::Cushion, origin + Vec3::Y * 0.44 + rot * Vec3::new(0.0, 0.0, 0.55), Vec3::new(0.5, 0.04, 0.7), yaw);
+    m.add_box_rotated(MatId::Fabric, origin + Vec3::Y * 0.44 + rot * Vec3::new(0.0, 0.0, 0.55), Vec3::new(0.5, 0.04, 0.7), yaw);
 }
 
 /// Parasol: pole, ribs, scalloped canopy.
@@ -386,7 +386,7 @@ pub fn umbrella(m: &mut MeshBuilder, origin: Vec3, yaw: f32, scale: f32) {
         let rim1 = origin + Vec3::Y * (h - 0.42) + Vec3::new(a1.cos() * r, 0.0, a1.sin() * r);
         let apex = origin + Vec3::Y * h;
         // Alternating panels read as a striped parasol.
-        let mat = if i % 2 == 0 { MatId::WhitePaint } else { MatId::Cushion };
+        let mat = if i % 2 == 0 { MatId::WhitePaint } else { MatId::Fabric };
         m.bucket(mat).tri(
             [apex, rim0, rim1],
             [Vec3::Y; 3],
@@ -403,7 +403,7 @@ pub fn flower_bed(m: &mut MeshBuilder, origin: Vec3, yaw: f32, scale: f32, seed:
         let a = rand01(seed.wrapping_add(i)) * TAU;
         let r = rand01(seed.wrapping_add(i * 7)) * 1.8 * scale;
         let p = origin + Quat::from_rotation_y(yaw) * Vec3::new(a.cos() * r, 0.62, a.sin() * r * 0.55);
-        let mat = if i % 3 == 0 { MatId::Cushion } else { MatId::Frond };
+        let mat = if i % 3 == 0 { MatId::Fabric } else { MatId::Frond };
         m.add_sphere(mat, p, Vec3::splat(0.11 * scale), 3, 6);
     }
 }
@@ -489,7 +489,7 @@ pub fn life_ring(m: &mut MeshBuilder, origin: Vec3, yaw: f32, _scale: f32) {
     for i in 0..10 {
         let a = i as f32 * TAU / 10.0;
         let p = origin + Vec3::Y * 1.05 + Quat::from_rotation_y(yaw) * Vec3::new(a.cos() * 0.24, a.sin() * 0.24, 0.06);
-        let mat = if i % 2 == 0 { MatId::Cushion } else { MatId::WhitePaint };
+        let mat = if i % 2 == 0 { MatId::Fabric } else { MatId::WhitePaint };
         m.add_box_rotated(mat, p, Vec3::new(0.15, 0.09, 0.09), a);
     }
 }

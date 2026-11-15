@@ -8,8 +8,8 @@
 //! the owner's penthouse on the roof.
 
 use super::{
-    palette::*, DecoKind, DoorSpec, LayoutBuilder, ResortLayout, LOBBY_CEILING, SERVICE_Y,
-    UPPER_CEILING,
+    palette::*, DecoKind, DoorSpec, LayoutBuilder, ResortLayout, LOBBY_CEILING, PENTHOUSE_Y,
+    RESTAURANT_DECK, SERVICE_Y, UPPER_CEILING,
 };
 use crate::core::ZoneId::*;
 use crate::world::mesh_kit::MatId;

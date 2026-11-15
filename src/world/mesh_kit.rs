@@ -19,6 +19,7 @@ use bevy::{
     math::Vec3,
     prelude::*,
     render::mesh::{Indices, Mesh, PrimitiveTopology},
+    mesh::VertexAttributeValues,
 };
 use std::f32::consts::{PI, TAU};
 
@@ -200,7 +201,7 @@ fn attributes_float2(
     attribute: bevy::render::mesh::MeshVertexAttribute,
 ) -> Vec<[f32; 2]> {
     match mesh.attribute(attribute) {
-        Some(Mesh::VertexAttributeValues::Float32x2(values)) => values.clone(),
+        Some(VertexAttributeValues::Float32x2(values)) => values.clone(),
         _ => Vec::new(),
     }
 }

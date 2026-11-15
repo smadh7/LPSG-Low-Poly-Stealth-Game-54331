@@ -6,14 +6,13 @@
 
 use super::brain::{Brain, BrainState};
 use super::schedule::RoutineStep;
-use super::{NpcIdentity, Waypoint};
+use super::NpcIdentity;
 use super::{Npc, NpcRole};
 use crate::core::ZoneId;
 use crate::player::character::{
     spawn_humanoid, ActorBody, CharacterMeshes, HumanoidRig, OutfitMaterials,
 };
 use crate::player::Stance;
-use crate::world::layout::resort_layout;
 use bevy::prelude::*;
 
 /// Authored NPC definition: identity plus routine.
@@ -174,6 +173,7 @@ pub fn spawn_npcs(
             zone: spec.zone,
         };
         let npc_name = spec.name;
+        let role = spec.role;
         let brain = spec.into_brain();
 
         let npc = commands
@@ -211,8 +211,8 @@ pub fn spawn_npcs(
             NpcBadge { owner: npc },
             Mesh3d(character_meshes.hair[0].clone()),
             MeshMaterial3d(materials.add(StandardMaterial {
-                base_color: spec.role.accent(),
-                emissive: LinearRgba::from(spec.role.accent()) * 0.6,
+                base_color: role.accent(),
+                emissive: LinearRgba::from(role.accent()) * 0.6,
                 perceptual_roughness: 0.6,
                 ..default()
             })),

@@ -27,7 +27,8 @@ use bevy::{
         tonemapping::Tonemapping,
     },
     image::{ImageAddressMode, ImageFilterMode, ImageSampler, ImageSamplerDescriptor},
-    pbr::{CascadeShadowConfigBuilder, CascadeShadowConfig, DirectionalLightShadowMap, EnvironmentMapLight},
+    pbr::{CascadeShadowConfig, CascadeShadowConfigBuilder, DirectionalLightShadowMap},
+    pbr::light_probe::environment_map::EnvironmentMapLight,
     prelude::*,
     render::{
         camera::Exposure,
@@ -562,7 +563,6 @@ pub fn apply_sky_environment(
                 specular_map: specular.clone(),
                 intensity: 1_100.0,
                 rotation: Quat::IDENTITY,
-                affects_lightmapped_meshes: true,
             });
         }
     }
@@ -575,7 +575,7 @@ pub fn setup_sky_mesh(
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
-    let mesh = meshes.add(Sphere::new(1400.0).mesh().ico(3).unwrap_or_default());
+    let mesh = meshes.add(Sphere::new(1400.0).mesh().ico(3).expect("ico sphere"));
     // Unlit so the dome is exactly the sky colour and never picks up shadows;
     // bright emissive pushes it above the bloom threshold near the horizon.
     let material = materials.add(StandardMaterial {
