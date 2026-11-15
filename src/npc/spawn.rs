@@ -8,7 +8,9 @@ use super::brain::{Brain, BrainState};
 use super::schedule::RoutineStep;
 use super::{Npc, NpcIdentity, NpcRole};
 use crate::core::ZoneId;
-use crate::player::character::{spawn_humanoid, ActorBody, CharacterMeshes, HumanoidRig};
+use crate::player::character::{
+    spawn_humanoid, ActorBody, CharacterMeshes, HumanoidRig, OutfitMaterials,
+};
 use crate::player::Stance;
 use crate::world::layout::resort_layout;
 use bevy::prelude::*;
@@ -139,44 +141,26 @@ fn npc_specs() -> Vec<NpcSpec> {
 }
 
 /// Spawn the resort population.
+///
+/// Each NPC is dressed by its role (see `NpcRole::outfit`) and given a
+/// different skin tone and hair colour, so the crowd reads as a crowd.
 pub fn spawn_npcs(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
     existing_meshes: Option<Res<CharacterMeshes>>,
+    outfits: Option<Res<OutfitMaterials>>,
 ) {
-    let layout = resort_layout();
+    let Some(outfits) = outfits else {
+        return;
+    };
     let character_meshes = CharacterMeshes::get_or_insert(&mut meshes, &mut commands, existing_meshes);
-    let skin = materials.add(StandardMaterial {
-        base_color: Color::srgb(0.78, 0.60, 0.46),
-        perceptual_roughness: 0.85,
-        ..default()
-    });
-    let hair = materials.add(StandardMaterial {
-        base_color: Color::srgb(0.20, 0.15, 0.12),
-        perceptual_roughness: 0.9,
-        ..default()
-    });
-    let shoes = materials.add(StandardMaterial {
-        base_color: Color::srgb(0.16, 0.16, 0.18),
-        perceptual_roughness: 0.9,
-        ..default()
-    });
 
-    for spec in npc_specs() {
-        let (torso_color, legs_color, accent) = spec.role.colors();
-        let torso_mat = materials.add(StandardMaterial {
-            base_color: torso_color,
-            perceptual_roughness: 0.85,
-            ..default()
-        });
-        let legs_mat = materials.add(StandardMaterial {
-            base_color: legs_color,
-            perceptual_roughness: 0.85,
-            ..default()
-        });
+    for (index, spec) in npc_specs().into_iter().enumerate() {
+        let variety = index as u8;
+        let outfit = spec.role.outfit(variety);
 
-        // Start at the NPC's second waypoint so routines spread out.
+        // Start at the NPC's first waypoint so routines spread out.
         let start = spec
             .routine
             .first()
@@ -189,7 +173,6 @@ pub fn spawn_npcs(
             zone: spec.zone,
         };
         let npc_name = spec.name;
-        let _speed_hint = spec.speed_hint;
         let brain = spec.into_brain();
 
         let npc = commands
@@ -200,7 +183,7 @@ pub fn spawn_npcs(
                 brain,
                 ActorBody {
                     radius: super::navigation::NPC_RADIUS,
-                    height: 1.8,
+                    height: 1.78,
                     velocity: Vec3::ZERO,
                     grounded: true,
                     ground_y: start.y,
@@ -216,29 +199,28 @@ pub fn spawn_npcs(
             npc,
             start,
             &character_meshes,
-            torso_mat,
-            legs_mat,
-            skin.clone(),
-            hair.clone(),
-            shoes.clone(),
+            &outfits,
+            outfit,
             None,
         );
 
-        // A coloured hat band / badge so roles are identifiable at a glance.
+        // A small coloured disc above the head identifies the role at a glance
+        // without breaking the realistic silhouette.
         commands.spawn((
             NpcBadge { owner: npc },
-            Mesh3d(character_meshes.hair.clone()),
+            Mesh3d(character_meshes.hair[0].clone()),
             MeshMaterial3d(materials.add(StandardMaterial {
-                base_color: accent,
-                perceptual_roughness: 0.7,
+                base_color: spec.role.accent(),
+                emissive: LinearRgba::from(spec.role.accent()) * 0.6,
+                perceptual_roughness: 0.6,
                 ..default()
             })),
-            Transform::from_translation(start + HumanoidRig::HEAD + Vec3::Y * 0.16)
-                .with_scale(Vec3::new(0.55, 0.35, 0.55)),
+            Transform::from_translation(start + HumanoidRig::HEAD + Vec3::Y * 0.24)
+                .with_scale(Vec3::new(0.30, 0.09, 0.30)),
+            bevy::pbr::NotShadowCaster,
         ));
     }
 
-    let _ = layout;
     info!("Spawned resort NPCs");
 }
 
@@ -256,7 +238,7 @@ pub fn update_badges(
     for (badge, mut transform) in &mut badges {
         if let Ok(npc) = npcs.get(badge.owner) {
             let yaw = npc.rotation.to_euler(EulerRot::YXZ).0;
-            let offset = Quat::from_rotation_y(yaw) * (HumanoidRig::HEAD + Vec3::Y * 0.16);
+            let offset = Quat::from_rotation_y(yaw) * (HumanoidRig::HEAD + Vec3::Y * 0.24);
             transform.translation = npc.translation + offset;
         }
     }

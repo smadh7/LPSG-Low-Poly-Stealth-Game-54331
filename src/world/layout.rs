@@ -1,13 +1,33 @@
 //! The "Coral Palm Resort" level definition.
 //!
-//! The layout is authored as data (`ResortLayout`) and then instantiated by
-//! [`super::builder`].  Keeping the layout as plain data means future maps can
-//! be added without touching any gameplay code.
+//! The resort is authored as data ([`ResortLayout`]) and instantiated by
+//! [`super::builder`]. Keeping the layout as plain data means future maps can be
+//! added without touching gameplay code.
+//!
+//! ## Authoring model
+//!
+//! Buildings are described with [`LayoutBuilder::building`], which emits the
+//! full architectural shell: floor slab, walls with real openings (doorways and
+//! windows with sills and lintels), and a ceiling. That replaced the original
+//! approach of stacking disconnected boxes, which is what produced walls that
+//! did not meet, rooms without ceilings, and the sense of an unfinished map.
+//!
+//! Every solid still doubles as collision: `is_obstacle` decides whether it
+//! blocks walking actors, so window openings stay walk-blocking while sills and
+//! lintels do not.
 
-use crate::core::{Block2, ZoneDefinition, ZoneId, ZoneRect, ZoneId::*};
+use crate::core::{Block2, ZoneDefinition, ZoneId, ZoneId::*, ZoneRect};
 use bevy::prelude::*;
 
-/// Palette used across the resort.
+/// Zone definitions and heights used throughout the resort.
+pub const GROUND_Y: f32 = 0.0;
+pub const LOBBY_CEILING: f32 = 4.6;
+pub const UPPER_CEILING: f32 = 9.0;
+pub const RESTAURANT_DECK: f32 = 2.4;
+pub const PENTHOUSE_Y: f32 = 29.8;
+pub const SERVICE_Y: f32 = -3.4;
+
+/// Timeless resort palette (approximate sRGB; textures carry the detail).
 pub mod palette {
     use bevy::prelude::*;
 
@@ -40,23 +60,28 @@ pub mod palette {
     pub const HOT_TUB: Color = Color::srgb(0.22, 0.48, 0.58);
 }
 
-/// A single static box of the world. These double as collision volumes.
+/// A single static box of the world, doubling as a collision volume.
 #[derive(Debug, Clone)]
 pub struct SolidSpec {
     pub center: Vec3,
     pub size: Vec3,
-    /// Base colour for the generated geometry.
-    pub color: Color,
-    /// Optional name for debugging / interaction hooks.
+    /// Surface material used when the geometry is built.
+    pub material: crate::world::mesh_kit::MatId,
+    /// Debug / interaction label.
     pub label: &'static str,
 }
 
 impl SolidSpec {
-    pub fn new(center: Vec3, size: Vec3, color: Color, label: &'static str) -> Self {
+    pub fn new(
+        center: Vec3,
+        size: Vec3,
+        material: crate::world::mesh_kit::MatId,
+        label: &'static str,
+    ) -> Self {
         Self {
             center,
             size,
-            color,
+            material,
             label,
         }
     }
@@ -65,14 +90,21 @@ impl SolidSpec {
         Block2::new(self.center, self.size)
     }
 
-    /// Whether this solid should block walking actors (very flat solids do not).
+    /// Whether this solid blocks walking actors.
+    ///
+    /// Walls, doors and furniture do; flat floor plates, sills, lintels and
+    /// ceilings do not (the player walks under them).
     pub fn is_obstacle(&self) -> bool {
-        self.size.y > 0.6 && self.center.y + self.size.y * 0.5 > 1.2
+        let top = self.center.y + self.size.y * 0.5;
+        let bottom = self.center.y - self.size.y * 0.5;
+        // Anything at head height and at least knee-high blocks movement.
+        self.size.y > 0.9 && top > GROUND_Y + 0.9 && bottom < GROUND_Y + 1.8
     }
 }
 
-/// A decorative mesh blob that is merged into a single draw call.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+/// Kinds of decorative prop. Each is built from real geometry in
+/// [`super::props`], not a single primitive.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum DecoKind {
     Palm,
     Bush,
@@ -84,6 +116,41 @@ pub enum DecoKind {
     PottedPlant,
     Bench,
     Umbrella,
+    // --- additions for the realistic pass ---
+    /// Large shade tree with layered canopy.
+    Tree,
+    /// Dense tropical shrub cluster.
+    ShrubCluster,
+    /// Grass tuft patch.
+    GrassTuft,
+    /// Outdoor dining table with four chairs.
+    DiningSet,
+    /// Bar table with stools.
+    BarSet,
+    /// Reception desk unit.
+    Reception,
+    /// Sofa / lounge chair.
+    Armchair,
+    /// Hotel bed.
+    Bed,
+    /// Nightstand with lamp.
+    Nightstand,
+    /// Long dining/console table.
+    ConsoleTable,
+    /// Kitchen island / prep counter.
+    Counter,
+    /// Stacked service crates.
+    Crates,
+    /// Wall-mounted air conditioning unit.
+    AirUnit,
+    /// Life-ring post on the beach.
+    LifeRing,
+    /// Beach shower.
+    BeachShower,
+    /// Stone balustrade segment.
+    Balustrade,
+    /// Potted palm (indoor planter).
+    IndoorPalm,
 }
 
 #[derive(Debug, Clone)]
@@ -94,16 +161,24 @@ pub struct DecoSpec {
     pub scale: f32,
 }
 
-/// Door / entrance definition used by the accessibility system and navigation.
+/// Door / entrance definition used by accessibility checks and navigation.
 #[derive(Debug, Clone)]
 pub struct DoorSpec {
     pub name: &'static str,
     /// Horizontal position of the door.
     pub position: Vec2,
-    /// Half extents of the "doorway" area used to check reachability.
+    /// Half width of the doorway used to check reachability.
     pub width: f32,
     /// Zone on either side (used for trespass checks).
     pub zone: ZoneId,
+}
+
+/// A flat/interior detail piece with no collision.
+#[derive(Debug, Clone)]
+pub struct InteriorDetail {
+    pub position: Vec3,
+    pub size: Vec3,
+    pub material: crate::world::mesh_kit::MatId,
 }
 
 /// The complete static level description.
@@ -112,14 +187,13 @@ pub struct ResortLayout {
     pub name: &'static str,
     pub solids: Vec<SolidSpec>,
     pub deco: Vec<DecoSpec>,
+    /// Non-colliding detail geometry (rugs, glazing, ceiling panels).
+    pub details: Vec<InteriorDetail>,
     pub zones: Vec<ZoneDefinition>,
     pub doors: Vec<DoorSpec>,
     /// Water areas: actors cannot enter.
     pub water: Vec<Block2>,
     /// Walkable floor surfaces that are not part of [`Self::solids`].
-    ///
-    /// The outdoor ground, beach and terraces are visual plates; without these
-    /// the physics would have nothing to stand on outside the buildings.
     pub floors: Vec<Block2>,
     /// Player spawn point.
     pub player_spawn: Vec3,
@@ -128,19 +202,19 @@ pub struct ResortLayout {
 impl ResortLayout {
     /// Look up the zone for a horizontal position.
     pub fn zone_at(&self, point: Vec2) -> ZoneId {
-        let mut best: Option<(&ZoneDefinition, u8)> = None;
+        let mut best: Option<&ZoneDefinition> = None;
         for zone in &self.zones {
             if zone.rect.contains(point) {
                 match best {
-                    Some((current, prio)) if prio >= zone.priority && current.rect.size().length() <= zone.rect.size().length() => {}
-                    _ => best = Some((zone, zone.priority)),
+                    Some(current) if current.priority > zone.priority => {}
+                    _ => best = Some(zone),
                 }
             }
         }
-        best.map(|(z, _)| z.id).unwrap_or(Beach)
+        best.map(|z| z.id).unwrap_or(Beach)
     }
 
-    /// All walkable static collision volumes.
+    /// All solids that block walking actors.
     pub fn obstacle_blocks(&self) -> Vec<Block2> {
         let mut blocks: Vec<Block2> = self
             .solids
@@ -162,41 +236,136 @@ impl ResortLayout {
 // Layout construction helpers
 // ---------------------------------------------------------------------------
 
-struct LayoutBuilder {
-    solids: Vec<SolidSpec>,
-    deco: Vec<DecoSpec>,
-    doors: Vec<DoorSpec>,
+pub struct LayoutBuilder {
+    pub solids: Vec<SolidSpec>,
+    pub deco: Vec<DecoSpec>,
+    pub doors: Vec<DoorSpec>,
+    /// Non-colliding interior detail (rugs, ceiling panels, glass).
+    pub details: Vec<InteriorDetail>,
+}
+
+impl Default for LayoutBuilder {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl LayoutBuilder {
-    fn new() -> Self {
+    pub fn new() -> Self {
         Self {
             solids: Vec::new(),
             deco: Vec::new(),
             doors: Vec::new(),
+            details: Vec::new(),
         }
     }
 
-    /// Add a solid from its XZ bounding rectangle and vertical extent.
-    fn slab(
+    /// Add a solid from its XZ rectangle and vertical extent.
+    pub fn slab(
         &mut self,
         name: &'static str,
         min: Vec2,
         max: Vec2,
         bottom: f32,
         top: f32,
-        color: Color,
+        material: crate::world::mesh_kit::MatId,
     ) {
-        let center = Vec3::new((min.x + max.x) * 0.5, (bottom + top) * 0.5, (min.y + max.y) * 0.5);
+        let center = Vec3::new(
+            (min.x + max.x) * 0.5,
+            (bottom + top) * 0.5,
+            (min.y + max.y) * 0.5,
+        );
         let size = Vec3::new(max.x - min.x, top - bottom, max.y - min.y);
-        self.solids.push(SolidSpec::new(center, size, color, name));
+        self.solids.push(SolidSpec::new(center, size, material, name));
     }
 
-    fn wall(&mut self, name: &'static str, min: Vec2, max: Vec2, height: f32, color: Color) {
-        self.slab(name, min, max, 0.0, height, color);
+    /// Wall running from `a` to `b` (axis aligned), `thickness` wide.
+    pub fn wall(
+        &mut self,
+        name: &'static str,
+        a: Vec2,
+        b: Vec2,
+        height: f32,
+        material: crate::world::mesh_kit::MatId,
+    ) {
+        self.wall_with_base(name, a, b, 0.0, height, material);
     }
 
-    fn deco(&mut self, kind: DecoKind, position: Vec3, yaw: f32, scale: f32) {
+    pub fn wall_with_base(
+        &mut self,
+        name: &'static str,
+        a: Vec2,
+        b: Vec2,
+        base: f32,
+        height: f32,
+        material: crate::world::mesh_kit::MatId,
+    ) {
+        let min = a.min(b);
+        let max = a.max(b);
+        self.slab(name, min, max, base, base + height, material);
+    }
+
+    /// A wall with a rectangular opening (door or window) cut out of it.
+    ///
+    /// The wall runs along its longer axis; the opening is centred on
+    /// `opening_center` and spans `opening_width` along the wall, from
+    /// `opening_bottom` to `opening_top`.
+    #[allow(clippy::too_many_arguments)]
+    pub fn wall_with_opening(
+        &mut self,
+        name: &'static str,
+        a: Vec2,
+        b: Vec2,
+        thickness: f32,
+        height: f32,
+        opening_center: f32,
+        opening_width: f32,
+        opening_bottom: f32,
+        opening_top: f32,
+        material: crate::world::mesh_kit::MatId,
+    ) {
+        let horizontal = (b.x - a.x).abs() >= (b.y - a.y).abs();
+        let (start, end, fixed) = if horizontal {
+            (a.x.min(b.x), a.x.max(b.x), (a.y + b.y) * 0.5)
+        } else {
+            (a.y.min(b.y), a.y.max(b.y), (a.x + b.x) * 0.5)
+        };
+        let half = thickness * 0.5;
+        let piece = |name: &'static str, from: f32, to: f32, bottom: f32, top: f32| {
+            if to - from <= 0.001 || top - bottom <= 0.001 {
+                return;
+            }
+            if horizontal {
+                self.slab(name, Vec2::new(from, fixed - half), Vec2::new(to, fixed + half), bottom, top, material);
+            } else {
+                self.slab(name, Vec2::new(fixed - half, from), Vec2::new(fixed + half, to), bottom, top, material);
+            }
+        };
+
+        let open_lo = (opening_center - opening_width * 0.5).max(start);
+        let open_hi = (opening_center + opening_width * 0.5).min(end);
+        // Sections either side of the opening, full height.
+        piece(name, start, open_lo, 0.0, height);
+        piece(name, open_hi, end, 0.0, height);
+        // Below the opening (sill / door threshold) and above (lintel).
+        if opening_bottom > 0.02 {
+            piece(name, open_lo, open_hi, 0.0, opening_bottom);
+        }
+        if opening_top < height - 0.02 {
+            piece(name, open_lo, open_hi, opening_top, height);
+        }
+    }
+
+    /// Non-colliding detail geometry (glazing, rugs, ceiling light panels).
+    pub fn detail(&mut self, position: Vec3, size: Vec3, material: crate::world::mesh_kit::MatId) {
+        self.details.push(InteriorDetail {
+            position,
+            size,
+            material,
+        });
+    }
+
+    pub fn deco(&mut self, kind: DecoKind, position: Vec3, yaw: f32, scale: f32) {
         self.deco.push(DecoSpec {
             kind,
             position,
@@ -204,450 +373,34 @@ impl LayoutBuilder {
             scale,
         });
     }
+
+    pub fn door(&mut self, spec: DoorSpec) {
+        self.doors.push(spec);
+    }
 }
 
-/// Build the Coral Palm Resort layout. All coordinates are in metres; the map is
-/// roughly 148 x 134 units and is fully enclosed by the sea / cliffs.
+/// Build the Coral Palm Resort layout.
+///
+/// Coordinates are metres; the site is roughly 148 x 134. Sea lies to the south
+/// (−Z), the hotel in the middle, the gardens between them, the service level
+/// under the west gardens, and the penthouse on the hotel roof.
 pub fn resort_layout() -> ResortLayout {
-    let mut b = LayoutBuilder::new();
-    use palette::*;
-
-    // -----------------------------------------------------------------------
-    // Ground plates (visual only, generated separately from collision blocks)
-    // -----------------------------------------------------------------------
-    // The beach and gardens are outdoor ground; the hotel sits in the middle.
-
-    // -----------------------------------------------------------------------
-    // HOTEL — main building. Two storeys, ~58 x 40 footprint.
-    // Outer walls are 0.6 thick with doorway gaps.
-    // -----------------------------------------------------------------------
-    let hotel_min = Vec2::new(-29.0, -14.0);
-    let hotel_max = Vec2::new(29.0, 26.0);
-    let wall_t = 0.7;
-    let h1 = 4.6; // storey height
-    let h2 = 9.2; // top of the second storey
-
-    // --- North wall (z = 26) with the gated Penthouse terrace stair behind it
-    b.wall("Hotel North Wall L", Vec2::new(hotel_min.x, hotel_max.y - wall_t), Vec2::new(-4.5, hotel_max.y), h2, WALL);
-    b.wall("Hotel North Wall R", Vec2::new(4.5, hotel_max.y - wall_t), Vec2::new(hotel_max.x, hotel_max.y), h2, WALL);
-    // Lintel above the lobby's north door so the doorway itself stays walkable.
-    b.slab(
-        "Hotel North Door Lintel",
-        Vec2::new(-4.5, hotel_max.y - wall_t),
-        Vec2::new(4.5, hotel_max.y),
-        3.6,
-        h2,
-        WALL,
-    );
-
-    // --- South wall (z = -14) faces the gardens. Guest entrance in the middle.
-    b.wall("Hotel South Wall L", Vec2::new(hotel_min.x, hotel_min.y), Vec2::new(-5.0, hotel_min.y + wall_t), h2, WALL);
-    b.wall("Hotel South Wall R", Vec2::new(5.0, hotel_min.y), Vec2::new(hotel_max.x, hotel_min.y + wall_t), h2, WALL);
-    // Lintel above the guest entrance.
-    let lintel = Vec2::new(-5.0, hotel_min.y);
-    b.slab(
-        "Hotel South Entrance Lintel",
-        lintel,
-        Vec2::new(5.0, hotel_min.y + wall_t),
-        3.6,
-        h2,
-        WALL,
-    );
-
-    // --- West wall (service side) with a service door to the corridors.
-    b.wall("Hotel West Wall N", Vec2::new(hotel_min.x, 2.0), Vec2::new(hotel_min.x + wall_t, hotel_max.y), h2, WALL);
-    b.wall("Hotel West Wall S", Vec2::new(hotel_min.x, hotel_min.y), Vec2::new(hotel_min.x + wall_t, -2.0), h2, WALL);
-    b.slab(
-        "Hotel West Door Lintel",
-        Vec2::new(hotel_min.x, -2.0),
-        Vec2::new(hotel_min.x + wall_t, 2.0),
-        3.4,
-        h2,
-        WALL,
-    );
-
-    // --- East wall (glass frontage towards the gardens)
-    b.wall("Hotel East Wall", Vec2::new(hotel_max.x - wall_t, hotel_min.y), Vec2::new(hotel_max.x, hotel_max.y), h2, WALL);
-
-    // --- Second storey floor slab (also the lobby ceiling). Leaves an opening
-    // at the central atrium.
-    b.slab(
-        "Second Floor West",
-        Vec2::new(hotel_min.x, hotel_min.y),
-        Vec2::new(-7.0, hotel_max.y),
-        h1,
-        h1 + 0.5,
-        MARBLE,
-    );
-    b.slab(
-        "Second Floor East",
-        Vec2::new(7.0, hotel_min.y),
-        Vec2::new(hotel_max.x, hotel_max.y),
-        h1,
-        h1 + 0.5,
-        MARBLE,
-    );
-    b.slab(
-        "Second Floor South",
-        Vec2::new(-7.0, hotel_min.y),
-        Vec2::new(7.0, -2.0),
-        h1,
-        h1 + 0.5,
-        MARBLE,
-    );
-    b.slab(
-        "Second Floor North",
-        Vec2::new(-7.0, 8.0),
-        Vec2::new(7.0, hotel_max.y),
-        h1,
-        h1 + 0.5,
-        MARBLE,
-    );
-    // Atrium railing around the opening (visual + safety collider).
-    b.slab("Atrium Railing N", Vec2::new(-7.0, 7.8), Vec2::new(7.0, 8.0), h1 + 0.5, h1 + 1.6, WOOD);
-    b.slab("Atrium Railing S", Vec2::new(-7.0, -2.0), Vec2::new(7.0, -1.8), h1 + 0.5, h1 + 1.6, WOOD);
-
-    // --- Roof (visual)
-    b.slab(
-        "Hotel Roof",
-        Vec2::new(hotel_min.x - 0.6, hotel_min.y - 0.6),
-        Vec2::new(hotel_max.x + 0.6, hotel_max.y + 0.6),
-        h2,
-        h2 + 0.5,
-        ROOF,
-    );
-
-    // --- Lobby reception desk & pillars
-    b.slab("Reception Desk", Vec2::new(-8.0, 8.0), Vec2::new(0.0, 10.0), 0.0, 1.15, WOOD);
-    b.slab("Reception Back Wall", Vec2::new(-8.0, 10.0), Vec2::new(0.0, 10.6), 0.0, 3.2, WOOD_LIGHT);
-    for i in 0..4 {
-        let x = -18.0 + i as f32 * 12.0;
-        b.slab(
-            "Lobby Pillar",
-            Vec2::new(x - 0.7, 1.4),
-            Vec2::new(x + 0.7, 2.8),
-            0.0,
-            h1,
-            MARBLE,
-        );
-    }
-    // Lobby lounge seating islands.
-    b.slab("Lobby Lounge Sofa A", Vec2::new(-20.0, -6.0), Vec2::new(-13.0, -3.2), 0.0, 0.75, CUSHION);
-    b.slab("Lobby Lounge Sofa B", Vec2::new(13.0, -6.0), Vec2::new(20.0, -3.2), 0.0, 0.75, CUSHION);
-
-    // -----------------------------------------------------------------------
-    // RESTAURANT — raised terrace (2.4 m) east of the lobby.
-    // -----------------------------------------------------------------------
-    let rest = 2.4;
-    b.slab("Restaurant Deck", Vec2::new(31.0, -14.0), Vec2::new(56.0, 14.0), -0.1, rest, WOOD_LIGHT);
-    b.wall("Restaurant North Wall", Vec2::new(31.0, 13.3), Vec2::new(56.0, 14.0), 4.4, WALL);
-    if let Some(w) = b.solids.last_mut() {
-        w.center.y += rest;
-    }
-    b.wall("Restaurant South Wall", Vec2::new(31.0, -14.0), Vec2::new(56.0, -13.3), 4.4, WALL);
-    if let Some(w) = b.solids.last_mut() {
-        w.center.y += rest;
-    }
-    b.wall("Restaurant East Wall", Vec2::new(55.3, -14.0), Vec2::new(56.0, 14.0), 4.4, WALL);
-    if let Some(w) = b.solids.last_mut() {
-        w.center.y += rest;
-    }
-    // West face opens onto the lobby through a doorway at z = -1..1.
-    b.wall("Restaurant West Wall A", Vec2::new(31.0, -14.0), Vec2::new(31.7, -1.0), 4.4, WALL);
-    if let Some(w) = b.solids.last_mut() {
-        w.center.y += rest;
-    }
-    b.wall("Restaurant West Wall B", Vec2::new(31.0, 1.0), Vec2::new(31.7, 14.0), 4.4, WALL);
-    if let Some(w) = b.solids.last_mut() {
-        w.center.y += rest;
-    }
-    b.slab("Restaurant Door Lintel", Vec2::new(31.0, -1.0), Vec2::new(31.7, 1.0), rest + 3.0, rest + 4.4, WALL);
-    b.slab("Restaurant Roof", Vec2::new(30.6, -14.4), Vec2::new(56.4, 14.4), rest + 4.4, rest + 4.9, ROOF);
-    // Kitchen counter and partition in the north-east corner.
-    b.slab("Kitchen Counter", Vec2::new(47.0, 6.0), Vec2::new(55.0, 8.0), rest, rest + 1.1, METAL);
-    b.slab("Kitchen Partition", Vec2::new(46.6, 8.0), Vec2::new(47.4, 13.3), rest, rest + 4.4, SERVICE);
-    // Tables.
-    for (x, z) in [(36.0f32, -8.0f32), (42.0, -8.0), (36.0, 0.0), (42.0, 0.0), (36.0, 8.0), (42.0, 8.0)] {
-        b.slab(
-            "Restaurant Table",
-            Vec2::new(x - 1.0, z - 1.0),
-            Vec2::new(x + 1.0, z + 1.0),
-            rest,
-            rest + 0.78,
-            MARBLE,
-        );
-    }
-    // Staircase up the south face of the terrace: solid columns so every
-    // riser is only 0.24 m (well below the player's 0.62 m step height).
-    let rest_steps = 10;
-    for i in 0..rest_steps {
-        let top = (i as f32 + 1.0) * (rest / rest_steps as f32);
-        let z0 = -19.0 + i as f32 * 0.5;
-        b.slab(
-            "Restaurant Stair",
-            Vec2::new(33.0, z0),
-            Vec2::new(35.0, z0 + 0.52),
-            -0.2,
-            top,
-            STONE,
-        );
-    }
-
-    // -----------------------------------------------------------------------
-    // PENTHOUSE TERRACE — the target's private level on top of the hotel.
-    // Elevated +29.8 m; reached by an external stair on the west face.
-    // -----------------------------------------------------------------------
-    let pent = 29.8;
-    b.slab("Penthouse Terrace", Vec2::new(-18.0, 27.0), Vec2::new(18.0, 50.0), pent - 0.3, pent, MARBLE);
-    b.slab("Penthouse Rail W", Vec2::new(-18.0, 27.0), Vec2::new(-17.4, 50.0), pent, pent + 1.1, MARBLE);
-    b.slab("Penthouse Rail E", Vec2::new(17.4, 27.0), Vec2::new(18.0, 50.0), pent, pent + 1.1, MARBLE);
-    b.slab("Penthouse Rail N", Vec2::new(-18.0, 49.4), Vec2::new(18.0, 50.0), pent, pent + 1.1, MARBLE);
-    // Suite shell with a doorway facing south.
-    for (min, max) in [(-9.0, -1.1), (1.1, 9.0)] {
-        b.slab(
-            "Penthouse Suite South",
-            Vec2::new(min, 33.0),
-            Vec2::new(max, 33.8),
-            pent,
-            pent + 4.0,
-            WALL,
-        );
-    }
-    b.slab("Penthouse Suite West", Vec2::new(-9.0, 33.0), Vec2::new(-8.2, 46.0), pent, pent + 4.0, WALL);
-    b.slab("Penthouse Suite East", Vec2::new(8.2, 33.0), Vec2::new(9.0, 46.0), pent, pent + 4.0, WALL);
-    b.slab("Penthouse Suite North", Vec2::new(-9.0, 45.2), Vec2::new(9.0, 46.0), pent, pent + 4.0, WALL);
-    b.slab("Penthouse Suite Roof", Vec2::new(-9.4, 32.6), Vec2::new(9.4, 46.4), pent + 4.0, pent + 4.4, ROOF_DARK);
-    // Terrace furniture.
-    b.slab("Hot Tub", Vec2::new(9.0, 30.0), Vec2::new(15.0, 36.0), pent, pent + 0.8, HOT_TUB);
-    b.slab("Penthouse Desk", Vec2::new(-4.0, 43.0), Vec2::new(4.0, 44.4), pent, pent + 1.1, WOOD);
-    b.slab("Penthouse Safe", Vec2::new(5.5, 43.5), Vec2::new(7.0, 45.0), pent, pent + 2.0, SERVICE_DARK);
-    b.deco(DecoKind::PottedPlant, Vec3::new(-16.0, pent, 28.5), 0.0, 1.0);
-    b.deco(DecoKind::PottedPlant, Vec3::new(16.0, pent, 28.5), 0.0, 1.0);
-
-    // External staircase: 72 solid columns with 0.41 m risers, climbing from
-    // the gardens (z = 28) up to the terrace landing (z = 48).
-    let stair_steps = 72;
-    let riser = pent / stair_steps as f32;
-    for i in 0..stair_steps {
-        let top = (i as f32 + 1.0) * riser;
-        let z0 = 28.0 + i as f32 * 0.28;
-        b.slab(
-            "Penthouse Stair",
-            Vec2::new(-32.0, z0 - 0.01),
-            Vec2::new(-29.0, z0 + 0.31),
-            -0.2,
-            top,
-            STONE,
-        );
-    }
-    b.slab("Stair Landing", Vec2::new(-32.0, 48.2), Vec2::new(-18.0, 49.6), pent - 0.3, pent, STONE);
-    // Security gate at the foot of the stairs (restricted access).
-    b.slab("Stair Gate Post L", Vec2::new(-32.6, 27.2), Vec2::new(-31.6, 28.0), 0.0, 2.4, SECURITY);
-    b.slab("Stair Gate Post R", Vec2::new(-29.4, 27.2), Vec2::new(-28.4, 28.0), 0.0, 2.4, SECURITY);
-
-    // -----------------------------------------------------------------------
-    // SERVICE CORRIDORS — below the gardens (floor at -3.4), staff only.
-    // Reached by a ramp that starts just east of the western perimeter.
-    // -----------------------------------------------------------------------
-    let svc = -3.4;
-    b.slab("Service Floor", Vec2::new(-48.0, -30.0), Vec2::new(-30.0, 22.0), svc - 0.2, svc, SERVICE_DARK);
-    b.wall("Service Wall W", Vec2::new(-48.6, -30.0), Vec2::new(-48.0, 22.0), 6.0, SERVICE);
-    if let Some(w) = b.solids.last_mut() {
-        w.center.y += svc;
-    }
-    b.wall("Service Wall E A", Vec2::new(-30.0, -30.0), Vec2::new(-29.4, -14.0), 6.0, SERVICE);
-    if let Some(w) = b.solids.last_mut() {
-        w.center.y += svc;
-    }
-    b.wall("Service Wall S", Vec2::new(-48.0, -30.6), Vec2::new(-29.4, -30.0), 6.0, SERVICE);
-    if let Some(w) = b.solids.last_mut() {
-        w.center.y += svc;
-    }
-    // Staircase down into the corridor from the gardens (north side): solid
-    // columns with 0.12 m risers so the descent is smooth.
-    for i in 0..28 {
-        let top = -(i as f32 + 1.0) * (3.4 / 28.0);
-        let z0 = 22.4 - i as f32 * 0.55;
-        b.slab(
-            "Service Ramp",
-            Vec2::new(-35.0, z0 - 0.57),
-            Vec2::new(-31.0, z0),
-            svc,
-            top,
-            STONE_DARK,
-        );
-    }
-    b.slab("Service Crates A", Vec2::new(-46.0, -4.0), Vec2::new(-42.0, 0.0), svc, svc + 1.5, WOOD);
-    b.slab("Service Crates B", Vec2::new(-46.0, -10.0), Vec2::new(-43.0, -7.5), svc, svc + 1.0, WOOD_LIGHT);
-    b.slab("Service Lockers", Vec2::new(-47.6, 10.0), Vec2::new(-45.0, 16.0), svc, svc + 2.2, SERVICE);
-    b.slab("Service Door Frame", Vec2::new(-30.0, -14.4), Vec2::new(-29.4, -13.6), svc, svc + 3.0, SERVICE_DARK);
-
-    // -----------------------------------------------------------------------
-    // SECURITY WING — attached to the service corridor. Restricted.
-    // -----------------------------------------------------------------------
-    b.slab("Security Floor", Vec2::new(-62.0, -30.0), Vec2::new(-48.0, -8.0), svc - 0.2, svc, SERVICE_DARK);
-    b.wall("Security Wall N", Vec2::new(-62.0, -8.6), Vec2::new(-48.0, -8.0), 6.0, SECURITY);
-    if let Some(w) = b.solids.last_mut() {
-        w.center.y += svc;
-    }
-    b.wall("Security Wall S", Vec2::new(-62.0, -30.6), Vec2::new(-48.0, -30.0), 6.0, SECURITY);
-    if let Some(w) = b.solids.last_mut() {
-        w.center.y += svc;
-    }
-    b.wall("Security Wall W", Vec2::new(-62.6, -30.0), Vec2::new(-62.0, -8.0), 6.0, SECURITY);
-    if let Some(w) = b.solids.last_mut() {
-        w.center.y += svc;
-    }
-    // East wall has the doorway that links to the corridor.
-    b.wall("Security Wall E", Vec2::new(-48.0, -30.0), Vec2::new(-47.4, -22.0), 6.0, SECURITY);
-    if let Some(w) = b.solids.last_mut() {
-        w.center.y += svc;
-    }
-    // CCTV control desks.
-    b.slab("Camera Desk", Vec2::new(-60.0, -26.0), Vec2::new(-52.0, -23.5), svc, svc + 1.1, SERVICE);
-    b.slab("Evidence Rack", Vec2::new(-61.6, -18.0), Vec2::new(-59.0, -12.0), svc, svc + 1.5, METAL);
-    b.deco(DecoKind::PottedPlant, Vec3::new(-50.0, svc, -10.0), 0.0, 0.8);
-
-    // -----------------------------------------------------------------------
-    // STAFF ROOM / LOCKER ROOM (east of the lobby, behind the restaurant).
-    // -----------------------------------------------------------------------
-    b.slab("Staff Room Floor", Vec2::new(31.0, 16.0), Vec2::new(46.0, 26.0), -0.1, 0.1, WOOD_LIGHT);
-    b.wall("Staff Room N", Vec2::new(31.0, 26.0), Vec2::new(46.0, 26.6), 3.2, WALL);
-    b.wall("Staff Room E", Vec2::new(46.0, 16.0), Vec2::new(46.6, 26.6), 3.2, WALL);
-    b.wall("Staff Room W", Vec2::new(31.0, 16.0), Vec2::new(31.6, 26.0), 3.2, WALL);
-    b.slab("Staff Room Roof", Vec2::new(30.6, 15.6), Vec2::new(46.6, 26.6), 3.2, 3.6, ROOF_DARK);
-    b.slab("Staff Lockers", Vec2::new(43.0, 17.0), Vec2::new(45.6, 25.0), 0.0, 2.2, SERVICE);
-    b.slab("Staff Table", Vec2::new(35.0, 20.0), Vec2::new(38.0, 22.0), 0.0, 0.8, WOOD);
-
-    // -----------------------------------------------------------------------
-    // GARDENS — south of the hotel. Hedges create a hedge maze.
-    // -----------------------------------------------------------------------
-    let hedge = GRASS_DARK;
-    let hedges: &[(f32, f32, f32, f32)] = &[
-        (-40.0, -20.0, -10.0, -19.0),
-        (-2.0, -20.0, 30.0, -19.0),
-        (-40.0, -30.0, -39.0, -20.0),
-        (29.0, -30.0, 30.0, -20.0),
-        (-28.0, -32.0, -10.0, -31.0),
-        (2.0, -32.0, 20.0, -31.0),
-        (-28.0, -42.0, -27.0, -32.0),
-        (19.0, -42.0, 20.0, -32.0),
-        (-14.0, -44.0, 14.0, -43.0),
-        (-14.0, -44.0, -13.0, -36.0),
-        (13.0, -44.0, 14.0, -36.0),
-    ];
-    for (min_x, min_z, max_x, max_z) in hedges {
-        b.slab("Hedge", Vec2::new(*min_x, *min_z), Vec2::new(*max_x, *max_z), 0.0, 1.5, hedge);
-    }
-    // Fountain in the garden centre.
-    b.slab("Fountain Base", Vec2::new(-4.0, -26.0), Vec2::new(6.0, -24.0), 0.0, 0.7, STONE);
-    b.slab("Fountain Pillar", Vec2::new(0.0, -25.6), Vec2::new(2.0, -24.4), 0.7, 2.2, STONE_DARK);
-    b.deco(DecoKind::FlowerBed, Vec3::new(-20.0, 0.0, -22.0), 0.0, 1.0);
-    b.deco(DecoKind::FlowerBed, Vec3::new(12.0, 0.0, -22.0), 0.0, 1.0);
-    b.deco(DecoKind::FlowerBed, Vec3::new(-24.0, 0.0, -38.0), 0.0, 1.0);
-    b.deco(DecoKind::FlowerBed, Vec3::new(10.0, 0.0, -48.0), 0.0, 1.0);
-    b.deco(DecoKind::Bench, Vec3::new(-8.0, 0.0, -20.6), 0.0, 1.0);
-    b.deco(DecoKind::Bench, Vec3::new(8.0, 0.0, -20.6), 0.0, 1.0);
-
-    // Palm trees around the gardens & beach.
-    let palms: &[(f32, f32, f32)] = &[
-        (-44.0, -24.0, 1.1),
-        (-44.0, -36.0, 0.9),
-        (-16.0, -38.0, 1.2),
-        (24.0, -38.0, 1.0),
-        (24.0, -24.0, 1.15),
-        (-34.0, -48.0, 1.0),
-        (34.0, -48.0, 1.05),
-        (-52.0, -18.0, 0.95),
-        (52.0, -20.0, 1.0),
-        (-56.0, 10.0, 1.0),
-        (58.0, 12.0, 0.9),
-        (-44.0, 34.0, 1.05),
-        (40.0, 34.0, 1.1),
-    ];
-    for (x, z, s) in palms {
-        b.deco(DecoKind::Palm, Vec3::new(*x, 0.0, *z), (*x).atan2(*z), *s);
-    }
-
-    // -----------------------------------------------------------------------
-    // BEACH — south edge of the map with parasols and loungers.
-    // -----------------------------------------------------------------------
-    for i in 0..9 {
-        let x = -52.0 + i as f32 * 13.0;
-        b.deco(DecoKind::Parasol, Vec3::new(x, 0.12, -54.0), i as f32, 1.0);
-        b.deco(DecoKind::SunLounger, Vec3::new(x + 2.4, 0.12, -54.0), 0.0, 1.0);
-    }
-    b.deco(DecoKind::Umbrella, Vec3::new(-30.0, 0.12, -50.0), 0.0, 1.0);
-
-    // Lobby & restaurant decorative lamps.
-    for (x, z) in [(-22.0f32, 20.0f32), (22.0, 20.0), (-22.0, -10.0), (22.0, -10.0)] {
-        b.deco(DecoKind::LampPost, Vec3::new(x, 0.0, z), 0.0, 1.0);
-    }
-    for i in 0..6 {
-        b.deco(DecoKind::LampPost, Vec3::new(-50.0 + i as f32 * 20.0, 0.0, -16.0), 0.0, 1.0);
-    }
-
-    // -----------------------------------------------------------------------
-    // Doors (also used for navigation + accessibility hints)
-    // -----------------------------------------------------------------------
-    b.doors.push(DoorSpec { name: "Lobby Entrance", position: Vec2::new(0.0, -14.3), width: 5.0, zone: Lobby });
-    b.doors.push(DoorSpec { name: "Lobby Terrace Door", position: Vec2::new(0.0, 26.3), width: 4.5, zone: Penthouse });
-    b.doors.push(DoorSpec { name: "Restaurant Terrace Door", position: Vec2::new(31.3, -1.0), width: 3.0, zone: Restaurant });
-    b.doors.push(DoorSpec { name: "Service Door", position: Vec2::new(-29.3, 0.0), width: 4.0, zone: ServiceCorridor });
-    b.doors.push(DoorSpec { name: "Security Door", position: Vec2::new(-47.7, -26.0), width: 4.0, zone: SecurityWing });
-    b.doors.push(DoorSpec { name: "Staff Room Door", position: Vec2::new(31.3, 21.0), width: 3.0, zone: ServiceCorridor });
-
-    let zones = vec![
-        ZoneDefinition { id: Beach, rect: ZoneRect::new(-74.0, -66.0, 74.0, -46.0), priority: 1 },
-        ZoneDefinition { id: Gardens, rect: ZoneRect::new(-74.0, -46.0, 74.0, -14.0), priority: 2 },
-        ZoneDefinition { id: Lobby, rect: ZoneRect::new(-29.0, -14.0, 29.0, 26.0), priority: 6 },
-        ZoneDefinition { id: Restaurant, rect: ZoneRect::new(29.0, -14.0, 56.0, 14.0), priority: 5 },
-        ZoneDefinition { id: ServiceCorridor, rect: ZoneRect::new(-48.0, -30.0, -29.0, 22.0), priority: 7 },
-        ZoneDefinition { id: SecurityWing, rect: ZoneRect::new(-62.0, -30.0, -47.0, -8.0), priority: 9 },
-        ZoneDefinition { id: Penthouse, rect: ZoneRect::new(-32.0, 26.0, 18.0, 50.0), priority: 8 },
-    ];
-
-    ResortLayout {
-        name: "Coral Palm Resort",
-        solids: b.solids,
-        deco: b.deco,
-        zones,
-        doors: b.doors,
-        water: vec![
-            // The sea beyond the beach.
-            Block2::new(Vec3::new(0.0, -1.0, -62.0), Vec3::new(160.0, 2.0, 10.0)),
-        ],
-        // On the marble plaza just south of the lobby doors.
-        floors: vec![
-            // Outdoor ground (top at y = 0) built as four plates around the
-            // below-ground service corridor + security wing (x -62.6..-29,
-            // z -31..22.6) so those spaces are actually open to the sky.
-            Block2::new(Vec3::new(24.5, -1.0, -6.0), Vec3::new(107.0, 2.0, 128.0)),
-            Block2::new(Vec3::new(-70.3, -1.0, -6.0), Vec3::new(15.4, 2.0, 128.0)),
-            Block2::new(Vec3::new(-45.8, -1.0, -50.5), Vec3::new(33.6, 2.0, 39.0)),
-            Block2::new(Vec3::new(-45.8, -1.0, 40.3), Vec3::new(33.6, 2.0, 35.4)),
-            // Hotel interior ground floor.
-            Block2::new(Vec3::new(0.0, -1.0, 6.0), Vec3::new(60.0, 2.0, 42.0)),
-            // Staff room floor.
-            Block2::new(Vec3::new(38.5, -0.95, 21.0), Vec3::new(15.0, 2.1, 10.6)),
-            // Marble plaza in front of the lobby.
-            Block2::new(Vec3::new(0.0, -0.5, -16.5), Vec3::new(26.0, 1.0, 7.0)),
-        ],
-        player_spawn: Vec3::new(0.0, 0.05, -17.5),
-    }
+    layout::build()
 }
+
+pub mod build;
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
-    fn layout_has_expected_structures() {
+    fn resort_has_content() {
         let l = resort_layout();
-        assert!(l.solids.len() > 60, "resort should have many solids, got {}", l.solids.len());
+        assert!(l.solids.len() > 300, "expected a dense layout, got {}", l.solids.len());
         assert!(!l.deco.is_empty());
-        assert_eq!(l.zones.len(), 7);
         assert!(!l.obstacle_blocks().is_empty());
+        assert!(l.floors.len() >= 5);
     }
 
     #[test]
@@ -665,16 +418,49 @@ mod tests {
     fn player_spawn_is_walkable() {
         let l = resort_layout();
         let spawn = l.player_spawn;
-        assert_eq!(l.zone_at(Vec2::new(spawn.x, spawn.z)), Gardens);
-        for block in l.obstacle_blocks() {
-            let c = crate::core::Circle2 {
-                center: Vec2::new(spawn.x, spawn.z),
-                radius: 0.4,
-            };
+        let floor = crate::player::movement::ground_height(
+            &l.solids.iter().map(|s| s.block()).chain(l.floors.iter().copied()).collect::<Vec<_>>(),
+            Vec2::new(spawn.x, spawn.z),
+            0.38,
+            spawn.y,
+        );
+        assert!(floor.is_some_and(|f| f.abs() < 0.3), "spawn floor was {floor:?}");
+    }
+
+    #[test]
+    fn every_solid_has_positive_extent() {
+        for solid in resort_layout().solids {
             assert!(
-                block.resolve_circle(c).is_none(),
-                "player spawn must not be inside a solid"
+                solid.size.x > 0.0 && solid.size.y > 0.0 && solid.size.z > 0.0,
+                "{} has degenerate size {:?}",
+                solid.label,
+                solid.size
             );
         }
+    }
+
+    #[test]
+    fn openings_keep_walls_solid_above_and_below() {
+        let mut b = LayoutBuilder::new();
+        b.wall_with_opening(
+            "Test",
+            Vec2::new(0.0, 0.0),
+            Vec2::new(10.0, 0.3),
+            0.3,
+            4.6,
+            5.0,
+            1.8,
+            1.0,
+            3.0,
+            crate::world::mesh_kit::MatId::Plaster,
+        );
+        // Two side pieces, a sill and a lintel.
+        assert_eq!(b.solids.len(), 4);
+        // The doorway itself must be free of solid geometry at eye height.
+        let blocked = b
+            .solids
+            .iter()
+            .any(|s| s.size.y > 0.9 && s.center.y < 2.0 && (s.center.x - 5.0).abs() < 0.6);
+        assert!(!blocked, "the opening must be clear");
     }
 }

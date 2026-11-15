@@ -1,0 +1,26 @@
+# material, metres per texture repeat
+asphalt 4.0
+brass 1.0
+brick 1.5
+concrete 3.0
+dark_trim 1.0
+fabric 0.5
+frond 1.0
+grass 2.5
+hedge 1.5
+limestone 3.0
+marble 2.5
+metal 2.0
+palm_bark 1.0
+plaster 3.0
+roof 4.0
+rubber 1.0
+sand 3.0
+skin 0.5
+slate 2.0
+stone_wall 2.5
+terracotta 2.0
+travertine 2.5
+water_normal 8.0
+white_paint 2.0
+wood 2.0

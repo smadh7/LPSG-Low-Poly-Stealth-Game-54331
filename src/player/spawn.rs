@@ -3,17 +3,27 @@
 
 use super::camera::{CameraRig, ThirdPersonCamera};
 use super::character::{
-    outfit_colors, spawn_humanoid, ActorBody, CharacterMeshes, PlayerAvatar, PlayerVisual,
+    spawn_humanoid, ActorBody, CharacterMeshes, GarmentColor, Outfit, OutfitMaterials, PlayerAvatar,
+    PlayerVisual, SkinTone,
 };
 use crate::core::{VIEW_MODEL_LAYER, WORLD_LAYER};
 use crate::world::layout::resort_layout;
 use bevy::{core_pipeline::tonemapping::Tonemapping, prelude::*, render::view::RenderLayers};
 
+/// The player's default look: linen shirt, navy trousers, tan skin.
+pub const PLAYER_OUTFIT: Outfit = Outfit {
+    skin: SkinTone::Tan,
+    shirt: GarmentColor::Linen,
+    trousers: GarmentColor::Navy,
+    shoes: GarmentColor::Black,
+    hair: GarmentColor::HairBrown,
+};
+
 pub fn spawn_player(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
-    mut materials: ResMut<Assets<StandardMaterial>>,
     existing_meshes: Option<Res<CharacterMeshes>>,
+    outfits: Option<Res<OutfitMaterials>>,
 ) {
     let layout = resort_layout();
     let spawn = layout.player_spawn;
@@ -28,31 +38,19 @@ pub fn spawn_player(
         ))
         .id();
 
-    // --- Procedural body -------------------------------------------------
+    // --- Humanoid body ---------------------------------------------------
     let character_meshes = CharacterMeshes::get_or_insert(&mut meshes, &mut commands, existing_meshes);
-    let mat = |materials: &mut Assets<StandardMaterial>, color: Color| {
-        materials.add(StandardMaterial {
-            base_color: color,
-            perceptual_roughness: 0.85,
-            ..default()
-        })
+    let Some(outfits) = outfits else {
+        return;
     };
-    let shirt = mat(&mut materials, outfit_colors::SHIRT);
-    let trousers = mat(&mut materials, outfit_colors::TROUSERS);
-    let skin = mat(&mut materials, outfit_colors::SKIN);
-    let hair = mat(&mut materials, outfit_colors::HAIR);
-    let shoes = mat(&mut materials, outfit_colors::SHOES);
 
     spawn_humanoid(
         &mut commands,
         player,
         spawn,
         &character_meshes,
-        shirt,
-        trousers,
-        skin,
-        hair,
-        shoes,
+        &outfits,
+        PLAYER_OUTFIT,
         Some(PlayerVisual),
     );
 
@@ -66,37 +64,26 @@ pub fn spawn_player(
             ..default()
         },
         Tonemapping::TonyMcMapface,
+        bevy::render::camera::Exposure::BLENDER,
         Projection::from(PerspectiveProjection {
             fov: 68f32.to_radians(),
             near: 0.08,
-            far: 900.0,
+            far: 420.0,
             ..default()
         }),
         // The world camera must see the world *and* the player's own model.
         RenderLayers::from_layers(&[WORLD_LAYER, VIEW_MODEL_LAYER]),
         Transform::from_translation(spawn + Vec3::new(0.0, 3.2, -6.0))
             .looking_at(spawn + Vec3::Y * 1.5, Vec3::Y),
+        // Aerial perspective: warm, low-density haze that grows with distance.
+        // Exponential-squared falloff looks far more natural than linear fog.
         bevy::pbr::DistanceFog {
-            color: Color::srgba(0.70, 0.79, 0.86, 1.0),
-            falloff: bevy::pbr::FogFalloff::Linear {
-                start: 70.0,
-                end: 210.0,
-            },
+            color: Color::srgba(0.72, 0.80, 0.88, 1.0),
+            falloff: bevy::pbr::FogFalloff::ExponentialSquared { density: 0.0022 },
+            directional_light_color: Color::srgba(1.0, 0.94, 0.82, 1.0),
+            directional_light_exponent: 12.0,
             ..default()
         },
-    ));
-
-    // --- Personal fill light --------------------------------------------
-    commands.spawn((
-        Name::new("Player Fill Light"),
-        PointLight {
-            color: Color::srgb(1.0, 0.95, 0.88),
-            intensity: 16_000.0,
-            range: 10.0,
-            shadows_enabled: false,
-            ..default()
-        },
-        Transform::from_translation(spawn + Vec3::Y * 2.6),
     ));
 
     // --- Camera rig resource --------------------------------------------
@@ -110,13 +97,4 @@ pub fn spawn_player(
     commands.insert_resource(rig);
 }
 
-/// Keeps the player's fill light above them.
-pub fn follow_player_light(
-    players: Query<&Transform, With<PlayerAvatar>>,
-    mut lights: Query<&mut Transform, (With<PointLight>, Without<PlayerAvatar>)>,
-) {
-    let Ok(player) = players.single() else { return };
-    for mut light in &mut lights {
-        light.translation = player.translation + Vec3::Y * 2.6;
-    }
-}
+

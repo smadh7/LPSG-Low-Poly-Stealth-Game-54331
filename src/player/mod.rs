@@ -54,6 +54,7 @@ impl Plugin for PlayerPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<PlayerIntent>()
             .init_resource::<camera::CameraRig>()
+            .add_systems(PreStartup, build_character_materials)
             .add_systems(Startup, spawn::spawn_player)
             .add_systems(
                 Update,
@@ -67,6 +68,16 @@ impl Plugin for PlayerPlugin {
             )
             .add_systems(FixedUpdate, movement::player_physics);
     }
+}
+
+/// Create the shared character material palette once.
+fn build_character_materials(
+    mut commands: Commands,
+    asset_server: Res<AssetServer>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+) {
+    let outfits = character::build_outfit_materials(&asset_server, &mut materials);
+    commands.insert_resource(outfits);
 }
 
 /// Simple marker component for anything that should track the player.

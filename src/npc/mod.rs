@@ -69,96 +69,70 @@ impl NpcRole {
     }
 
     /// Primary body colours for the procedural model.
-    pub fn colors(self) -> (Color, Color, Color) {
-        // (torso, legs, accent)
-        match self {
-            NpcRole::Guest => (
-                Color::srgb(0.85, 0.55, 0.45),
-                Color::srgb(0.90, 0.86, 0.74),
-                Color::srgb(0.95, 0.82, 0.35),
-            ),
-            NpcRole::Waiter => (
-                Color::srgb(0.16, 0.17, 0.20),
-                Color::srgb(0.14, 0.15, 0.18),
-                Color::srgb(0.95, 0.95, 0.95),
-            ),
-            NpcRole::Bartender => (
-                Color::srgb(0.20, 0.24, 0.30),
-                Color::srgb(0.16, 0.17, 0.20),
-                Color::srgb(0.80, 0.65, 0.30),
-            ),
-            NpcRole::Concierge => (
-                Color::srgb(0.30, 0.36, 0.52),
-                Color::srgb(0.20, 0.22, 0.28),
-                Color::srgb(0.95, 0.82, 0.35),
-            ),
-            NpcRole::Housekeeping => (
-                Color::srgb(0.80, 0.76, 0.66),
-                Color::srgb(0.55, 0.52, 0.48),
-                Color::srgb(0.92, 0.92, 0.92),
-            ),
-            NpcRole::Chef => (
-                Color::srgb(0.95, 0.95, 0.95),
-                Color::srgb(0.22, 0.22, 0.24),
-                Color::srgb(0.90, 0.85, 0.75),
-            ),
-            NpcRole::SecurityGuard => (
-                Color::srgb(0.20, 0.26, 0.38),
-                Color::srgb(0.14, 0.17, 0.24),
-                Color::srgb(0.70, 0.72, 0.76),
-            ),
-            NpcRole::Manager => (
-                Color::srgb(0.18, 0.16, 0.15),
-                Color::srgb(0.14, 0.13, 0.12),
-                Color::srgb(0.85, 0.70, 0.35),
-            ),
-            NpcRole::Target => (
-                Color::srgb(0.93, 0.90, 0.84),
-                Color::srgb(0.24, 0.22, 0.28),
-                Color::srgb(0.85, 0.30, 0.35),
-            ),
+    /// Outfit used for this role.
+    ///
+    /// Staff wear the resort uniform (gold-accented linen for front of house,
+    /// navy for security); guests are dressed in plausible holiday clothing and
+    /// each one gets a different skin tone so the crowd never looks cloned.
+    pub fn outfit(self, variety: u8) -> crate::player::character::Outfit {
+        use crate::player::character::{GarmentColor as G, Outfit, SkinTone};
+        let skin = match variety % 6 {
+            0 => SkinTone::Porcelain,
+            1 => SkinTone::Fair,
+            2 => SkinTone::Olive,
+            3 => SkinTone::Tan,
+            4 => SkinTone::Brown,
+            _ => SkinTone::Deep,
+        };
+        let hair = match (variety / 6) % 5 {
+            0 => G::HairBrown,
+            1 => G::HairBlack,
+            2 => G::HairBlonde,
+            3 => G::HairGinger,
+            _ => G::HairGrey,
+        };
+        let (shirt, trousers, shoes) = match self {
+            NpcRole::Guest => {
+                let palettes = [
+                    (G::Linen, G::Sand, G::White),
+                    (G::Teal, G::Cream, G::Sand),
+                    (G::Cream, G::Olive, G::HairBrown),
+                    (G::Burgundy, G::Charcoal, G::Black),
+                    (G::Sand, G::White, G::Black),
+                    (G::Olive, G::Cream, G::Black),
+                ];
+                palettes[(variety as usize) % palettes.len()]
+            }
+            NpcRole::Waiter | NpcRole::Bartender => (G::White, G::Black, G::Black),
+            NpcRole::Chef => (G::White, G::Charcoal, G::Black),
+            NpcRole::Concierge => (G::HotelGold, G::Navy, G::Black),
+            NpcRole::Housekeeping => (G::Cream, G::Sand, G::White),
+            NpcRole::Manager => (G::Navy, G::Charcoal, G::Black),
+            NpcRole::SecurityGuard => (G::SecurityBlue, G::Black, G::Black),
+            NpcRole::Target => (G::White, G::Charcoal, G::Black),
+        };
+        Outfit {
+            skin,
+            shirt,
+            trousers,
+            shoes,
+            hair,
         }
     }
-}
 
-/// Identity data shown when the player looks at an NPC.
-#[derive(Component, Debug, Clone)]
-pub struct NpcIdentity {
-    pub name: &'static str,
-    pub role: NpcRole,
-    pub zone: ZoneId,
-}
-
-/// Marks the NPC's limbs for procedural animation.
-/// A navigation waypoint an NPC walks to.
-#[derive(Debug, Clone)]
-pub struct Waypoint {
-    pub position: Vec3,
-    /// How long the NPC idles at this waypoint before moving on.
-    pub wait: f32,
-    /// Label used by the HUD when the NPC arrives.
-    pub activity: &'static str,
-}
-
-/// Plugin gathering all NPC systems.
-pub struct NpcPlugin;
-
-impl Plugin for NpcPlugin {
-    fn build(&self, app: &mut App) {
-        app.add_systems(Startup, spawn::spawn_npcs)
-            .add_systems(
-                FixedUpdate,
-                (
-                    schedule::advance_routines,
-                    navigation::steer_npcs,
-                    navigation::npc_collisions.after(navigation::steer_npcs),
-                )
-                    .chain(),
-            )
-            .add_systems(
-                Update,
-                (navigation::animate_npcs, spawn::update_badges, brain::npc_tick_debug),
-            );
+    /// Accent colour used for the role badge above an NPC's head.
+    pub fn accent(self) -> Color {
+        match self {
+            NpcRole::Guest => Color::srgb(0.55, 0.72, 0.92),
+            NpcRole::Waiter | NpcRole::Bartender => Color::srgb(0.92, 0.92, 0.92),
+            NpcRole::Chef => Color::srgb(0.95, 0.95, 0.95),
+            NpcRole::Concierge => Color::srgb(0.88, 0.72, 0.32),
+            NpcRole::Housekeeping => Color::srgb(0.85, 0.78, 0.62),
+            NpcRole::Manager => Color::srgb(0.35, 0.45, 0.70),
+            NpcRole::SecurityGuard => Color::srgb(0.90, 0.35, 0.32),
+            NpcRole::Target => Color::srgb(0.85, 0.30, 0.55),
+        }
+    }
     }
 }
 
