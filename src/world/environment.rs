@@ -27,8 +27,10 @@ use bevy::{
         tonemapping::Tonemapping,
     },
     image::{ImageAddressMode, ImageFilterMode, ImageSampler, ImageSamplerDescriptor},
-    pbr::{CascadeShadowConfig, CascadeShadowConfigBuilder, DirectionalLightShadowMap},
-    pbr::light_probe::environment_map::EnvironmentMapLight,
+    pbr::{
+        CascadeShadowConfig, CascadeShadowConfigBuilder, DirectionalLightShadowMap,
+        EnvironmentMapLight,
+    },
     prelude::*,
     render::{
         camera::Exposure,
@@ -563,6 +565,7 @@ pub fn apply_sky_environment(
                 specular_map: specular.clone(),
                 intensity: 1_100.0,
                 rotation: Quat::IDENTITY,
+                affects_lightmapped_mesh_diffuse: true,
             });
         }
     }
