@@ -133,7 +133,13 @@ impl Plugin for GamePlugin {
 
         .add_systems(Update, (handle_state_transitions, capture_cursor, log_smoke_progress))
         .add_systems(Startup, capture_setup)
-        .add_systems(PostUpdate, capture_lock_camera)
+        // Must run *inside* Update, after the gameplay camera: PostUpdate would
+        // place it after transform propagation, so the new pose never reaches
+        // the render world.
+        .add_systems(
+            Update,
+            capture_lock_camera.after(player::camera::camera_follow),
+        )
         .add_systems(Update, capture_tick)
         .add_systems(Update, character::sync_body_parts);
     }
@@ -294,7 +300,13 @@ fn capture_tick(mut commands: Commands, queue: Option<ResMut<CaptureQueue>>) {
             commands
                 .spawn(Screenshot::primary_window())
                 .observe(save_to_disk(path.clone()));
-            info!("CAPTURE {} -> {}", shot.name, path);
+            info!(
+                "CAPTURE {} -> {} (eye {:?} yaw {:.1}deg)",
+                shot.name,
+                path,
+                shot.eye,
+                shot.yaw.to_degrees()
+            );
             queue.index += 1;
             queue.phase = CapturePhase::Saving;
             queue.wait = CAPTURE_SAVE_FRAMES;
