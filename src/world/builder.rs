@@ -222,7 +222,9 @@ pub struct WorldCollision {
 impl WorldCollision {
     pub fn from_layout(layout: &ResortLayout) -> Self {
         let blocks = layout.obstacle_blocks();
-        let mut surfaces = blocks.clone();
+        // *Every* solid can be stood on — including low stair treads and desks
+        // that are deliberately excluded from the walk-blocking set.
+        let mut surfaces: Vec<Block2> = layout.solids.iter().map(|solid| solid.block()).collect();
         surfaces.extend(layout.floors.iter().copied());
         Self {
             blocks,
@@ -266,8 +268,9 @@ mod tests {
         assert_eq!(collision.blocks.len(), layout.obstacle_blocks().len());
         assert_eq!(
             collision.surfaces.len(),
-            collision.blocks.len() + layout.floors.len()
+            layout.solids.len() + layout.floors.len()
         );
+        assert!(collision.surfaces.len() > collision.blocks.len());
         assert_eq!(collision.zone_at(Vec2::new(0.0, 30.0)), ZoneId::Penthouse);
     }
 

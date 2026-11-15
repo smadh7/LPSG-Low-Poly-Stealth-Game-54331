@@ -173,7 +173,16 @@ pub fn player_physics(
     position.y += body.velocity.y * dt;
 
     // Find the highest surface within step height below the player.
-    let floor = ground_height(&collision.surfaces, Vec2::new(position.x, position.z), radius, position.y);
+    //
+    // This must use the *resolved* position: the collision pass pushes the body
+    // out of a step, and that pushed-out position is where the wider floor
+    // probe finds the tread to stand on.
+    let floor = ground_height(
+        &collision.surfaces,
+        Vec2::new(position.x, position.z),
+        radius,
+        position.y,
+    );
     let floor_y = floor.unwrap_or(-100.0);
 
     if position.y <= floor_y + 0.02 {
