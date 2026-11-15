@@ -66,25 +66,26 @@ pub const SUN_LUX: f32 = 82_000.0;
 /// and bloom thresholds all have to use the same units or they vanish.
 pub const SKY_RADIANCE: f32 = 9_000.0;
 
-/// Skybox brightness: converts the unit-range cubemap into cd/m².
-pub const SKY_BRIGHTNESS: f32 = SKY_RADIANCE * 0.9;
+/// Skybox brightness.
+///
+/// The skybox pass writes its colour straight to the HDR target *without* going
+/// through exposure, so this is in display-referred units (0..~2), not physical
+/// radiance. Matching the sky to the lit scene therefore means picking this so
+/// it sits where the tonemapper expects, not by converting to cd/m².
+pub const SKY_BRIGHTNESS: f32 = 1.0;
 
-/// Haze colour in scene-referred units, for distance fog.
+/// Haze colour for distance fog.
+///
+/// Bevy mixes the fog base colour in *before* exposure (like the skybox), while
+/// its directional in-scattering term is multiplied by the sun. Display-referred
+/// values are therefore the consistent choice here.
 pub fn fog_color() -> Color {
-    Color::LinearRgba(LinearRgba::rgb(
-        0.58 * SKY_RADIANCE,
-        0.68 * SKY_RADIANCE,
-        0.82 * SKY_RADIANCE,
-    ))
+    Color::LinearRgba(LinearRgba::rgb(0.52, 0.63, 0.78))
 }
 
 /// Sunlit haze colour, used by fog's directional (in-scattering) term.
 pub fn fog_sun_color() -> Color {
-    Color::LinearRgba(LinearRgba::rgb(
-        1.30 * SKY_RADIANCE,
-        1.15 * SKY_RADIANCE,
-        0.92 * SKY_RADIANCE,
-    ))
+    Color::LinearRgba(LinearRgba::rgb(1.0, 0.90, 0.76))
 }
 
 /// Direction *towards* the sun. Shared by lighting, sky generation and any
@@ -638,16 +639,16 @@ pub fn apply_post_processing(
         camera.insert(Tonemapping::TonyMcMapface);
         camera.insert(EXPOSURE);
         if settings.bloom {
-            // Bloom runs *before* tonemapping, so its threshold is in the same
-            // units as the lit scene. A threshold of 1.0 (the `NATURAL` preset)
-            // would bloom every sunlit surface white; this only catches lights,
-            // specular sun glints and the brightest sky.
+            // Bloom runs after the lit surfaces are exposure-scaled, so its
+            // threshold is in display-referred units. Only genuine light sources
+            // (lamp glass, the sun's specular glint, the brightest sky) exceed
+            // it; a threshold near 1.0 blooms every sunlit wall.
             camera.insert(Bloom {
                 prefilter: bevy::core_pipeline::bloom::BloomPrefilter {
-                    threshold: SKY_RADIANCE * 2.2,
-                    threshold_softness: 0.6,
+                    threshold: 1.6,
+                    threshold_softness: 0.5,
                 },
-                intensity: 0.12,
+                intensity: 0.10,
                 ..Bloom::NATURAL
             });
         } else {

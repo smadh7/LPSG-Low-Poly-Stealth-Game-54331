@@ -149,8 +149,9 @@ jobs:
           cat shots/diag.txt || true
           # One process, six viewpoints: the engine boot and level upload are
           # the expensive part, so batching keeps this step fast.
+          # Same viewpoint at several exposures, to calibrate in one pass.
           export HITMAN_CAPTURE=\
-          "01_arrival:0,2.2,-34,0,2.5,0;02_lobby:0,2.6,20,0,2.4,-4;03_gardens:-20,1.8,10,4,1.6,-14;04_pool:40,1.8,-12,30,1.0,-26;05_restaurant:46,3.6,8,34,2.2,-4;06_closeup:0.6,1.55,-3.0,0,1.55,-6;07_overview:0,42,-96,0,4,-6"
+          "ev15:0,2.6,20,0,2.4,-4,15;ev14:0,2.6,20,0,2.4,-4,14;ev13:0,2.6,20,0,2.4,-4,13;ev12:0,2.6,20,0,2.4,-4,12;out_ev15:0,14,-60,0,6,-6,15;out_ev13:0,14,-60,0,6,-6,13;pool_ev14:40,2.0,-14,30,1.0,-26,14"
           timeout 2400 xvfb-run -a -s "-screen 0 1600x900x24" \
             ./target/debug/hitman_lowpoly > shots/capture.log 2>&1 || true
           sed 's/\x1b\[[0-9;]*m//g' shots/capture.log | tail -25

@@ -177,6 +177,10 @@ fn capture_setup(mut state: ResMut<NextState<AppState>>, mut commands: Commands)
             eye,
             yaw,
             pitch,
+            // Optional 7th value overrides the camera exposure for this shot,
+            // which is how the exposure is calibrated without rerunning CI for
+            // every candidate value.
+            ev100: values.get(6).copied(),
         });
     }
     if shots.is_empty() {
@@ -208,6 +212,8 @@ pub struct CaptureShot {
     pub eye: Vec3,
     pub yaw: f32,
     pub pitch: f32,
+    /// Exposure override, in EV100.
+    pub ev100: Option<f32>,
 }
 
 /// Walks through the requested viewpoints, one screenshot each.
@@ -243,7 +249,8 @@ impl CaptureQueue {
 /// Park the camera at the current pose *after* every gameplay camera system has
 /// run, so the follow camera cannot drift the shot.
 fn capture_lock_camera(
-    mut camera: Query<&mut Transform, With<Camera3d>>,
+    mut commands: Commands,
+    mut camera: Query<(Entity, &mut Transform), With<Camera3d>>,
     queue: Option<Res<CaptureQueue>>,
 ) {
     let Some(queue) = queue else { return };
@@ -251,9 +258,14 @@ fn capture_lock_camera(
         return;
     }
     let Some(shot) = queue.current() else { return };
-    if let Ok(mut transform) = camera.single_mut() {
+    if let Ok((entity, mut transform)) = camera.single_mut() {
         transform.translation = shot.eye;
         transform.rotation = Quat::from_euler(EulerRot::YXZ, shot.yaw, shot.pitch, 0.0);
+        if let Some(ev100) = shot.ev100 {
+            commands
+                .entity(entity)
+                .insert(bevy::render::camera::Exposure { ev100 });
+        }
     }
 }
 
