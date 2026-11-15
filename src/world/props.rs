@@ -363,7 +363,7 @@ pub fn sun_lounger(m: &mut MeshBuilder, origin: Vec3, yaw: f32, _scale: f32) {
 }
 
 /// Parasol: pole, ribs, scalloped canopy.
-pub fn parasol(m: &mut MeshBuilder, origin: Vec3, yaw: f32, scale: f32) {
+pub fn parasol(m: &mut MeshBuilder, origin: Vec3, _yaw: f32, scale: f32) {
     let h = 2.35 * scale;
     m.add_cylinder(MatId::Metal, origin, 0.045, h, 8);
     m.add_cylinder(MatId::Metal, origin, 0.32, 0.10, 12);

@@ -16,10 +16,9 @@
 
 use bevy::{
     asset::RenderAssetUsages,
-    mesh::VertexAttributeValues,
     math::Vec3,
     prelude::*,
-    render::mesh::{Indices, Mesh, PrimitiveTopology},
+    render::mesh::{Indices, Mesh, PrimitiveTopology, VertexAttributeValues},
 };
 use std::f32::consts::{PI, TAU};
 

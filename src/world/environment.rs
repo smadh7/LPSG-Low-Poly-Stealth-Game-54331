@@ -28,8 +28,8 @@ use bevy::{
     },
     image::{ImageAddressMode, ImageFilterMode, ImageSampler, ImageSamplerDescriptor},
     pbr::{
-        CascadeShadowConfig, CascadeShadowConfigBuilder, DirectionalLightShadowMap,
-        EnvironmentMapLight,
+        prelude::EnvironmentMapLight, CascadeShadowConfig, CascadeShadowConfigBuilder,
+        DirectionalLightShadowMap,
     },
     prelude::*,
     render::{
