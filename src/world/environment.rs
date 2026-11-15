@@ -66,15 +66,12 @@ pub const SUN_LUX: f32 = 82_000.0;
 /// and bloom thresholds all have to use the same units or they vanish.
 pub const SKY_RADIANCE: f32 = 9_000.0;
 
-/// Skybox brightness.
+/// Skybox brightness, in cd/m².
 ///
-/// Bevy's PBR shader pre-multiplies *lights* by `view.exposure`, so a sunlit
-/// surface lands around 1.0 in the HDR target. The skybox pass does **not**
-/// apply exposure, so its output must already be in that same 0..2 range.
-/// Writing raw radiance here (9,000 cd/m²) blew out the entire frame through
-/// bloom. This constant is therefore the exposed value of the sky, not its
-/// physical luminance.
-pub const SKY_BRIGHTNESS: f32 = 0.92;
+/// Bevy's skybox uniform is `brightness * exposure`, so — like the PBR lights —
+/// this must be physical radiance, not an 0..1 colour. Passing a small number
+/// here makes the sky render black, because the exposure factor is ~7e-5.
+pub const SKY_BRIGHTNESS: f32 = SKY_RADIANCE;
 
 /// Haze colour for distance fog.
 ///
@@ -579,8 +576,8 @@ pub fn setup_environment(mut commands: Commands) {
     });
 
     info!(
-        "Environment: tropical afternoon, {:.0} lux sun + sky IBL (exposure {})",
-        SUN_LUX / 1000.0,
+        "Environment: tropical afternoon, {} lux sun + sky IBL (exposure EV{})",
+        SUN_LUX as u32,
         EXPOSURE.ev100
     );
 }

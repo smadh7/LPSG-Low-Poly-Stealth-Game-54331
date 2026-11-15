@@ -230,18 +230,18 @@ impl MaterialLibrary {
             },
         });
 
-        // Interior lamps and screens. Emissive with alpha 1.0 is *not* scaled by
-        // exposure (see `pbr_functions.wgsl`), so these are authored directly in
-        // the exposed 0..2 range: bright enough to read as lights against a
-        // sunlit room, without clipping to flat white.
+        // Interior lamps and screens, in radiance. `pbr_functions.wgsl` mixes
+        // emissive by exposure when alpha is 1.0, so these are physical values:
+        // roughly 10,000 cd/m² for a lamp diffuser, which clips to white the way
+        // a bright light should.
         let emissive_warm = materials.add(StandardMaterial {
             base_color: Color::srgb(0.95, 0.85, 0.70),
-            emissive: LinearRgba::new(3.2, 2.2, 1.2, 1.0),
+            emissive: LinearRgba::new(9_000.0, 6_400.0, 3_600.0, 1.0),
             ..default()
         });
         let emissive_cool = materials.add(StandardMaterial {
             base_color: Color::srgb(0.80, 0.90, 1.0),
-            emissive: LinearRgba::new(1.1, 1.7, 2.4, 1.0),
+            emissive: LinearRgba::new(4_500.0, 7_000.0, 10_000.0, 1.0),
             ..default()
         });
         let glass = materials.add(StandardMaterial {
