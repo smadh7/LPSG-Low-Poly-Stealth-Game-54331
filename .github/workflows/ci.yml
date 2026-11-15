@@ -1,0 +1,225 @@
+name: CI
+
+on:
+  push:
+  workflow_dispatch:
+    inputs:
+      windows:
+        description: "Also build the Windows release binary"
+        type: boolean
+        default: false
+
+env:
+  CARGO_TERM_COLOR: never
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  linux:
+    name: Check & Test (Linux)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends \
+            libasound2-dev libudev-dev pkg-config libwayland-dev libxkbcommon-dev
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: linux-check
+          # clippy/check and test variants each need their own compiled deps
+          cache-all-crates: true
+
+      - name: cargo check
+        id: check
+        continue-on-error: true
+        run: cargo check --all-targets --message-format=short > >(tee check.log) 2>&1
+
+      - name: cargo clippy
+        id: clippy
+        continue-on-error: true
+        run: cargo clippy --all-targets --message-format=short > >(tee clippy.log) 2>&1
+
+      - name: cargo test
+        id: test
+        continue-on-error: true
+        timeout-minutes: 30
+        run: cargo test --all-targets --message-format=short > >(tee test.log) 2>&1
+
+      - name: Publish logs to CI logs branch
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.sha }}
+          CHECK: ${{ steps.check.outcome }}
+          CLIPPY: ${{ steps.clippy.outcome }}
+          TEST: ${{ steps.test.outcome }}
+          RUN_ID: ${{ github.run_id }}
+          RUN_NUMBER: ${{ github.run_number }}
+          BRANCH: ${{ github.ref_name }}
+          MESSAGE: ${{ github.event.head_commit.message }}
+        run: |
+          set -e
+          mkdir -p out
+          # Human summary
+          {
+            echo "SHA: $SHA"
+            echo "BRANCH: $BRANCH"
+            echo "MESSAGE: $MESSAGE"
+            echo "CHECK: $CHECK"
+            echo "CLIPPY: $CLIPPY"
+            echo "TEST: $TEST"
+          } > out/summary.txt
+          # Trimmed logs: keep lines that matter, fall back to the tail.
+          python3 - <<'PY'
+          import os
+          for src, dst, limit in [("check.log", "out/check.txt", 220000),
+                                  ("clippy.log", "out/clippy.txt", 120000),
+                                  ("test.log", "out/test.txt", 120000)]:
+              if not os.path.exists(src):
+                  open(dst, "w").write("(missing)\n")
+                  continue
+              lines = open(src, errors="replace").read().splitlines()
+              keep = [l for l in lines if ("error" in l.lower() or "warning:" in l
+                      or l.startswith("--> ") or "panicked" in l or "test result" in l
+                      or "tests passed" in l or "test " in l and " ... " in l)]
+              if not keep:
+                  keep = lines
+              text = "\n".join(keep)
+              open(dst, "w").write(text[-limit:])
+              # raw tail keeps multi-line panic messages intact
+              open(dst.replace(".txt", "-raw.txt"), "w").write("\n".join(lines)[-limit:])
+          PY
+          cd out
+          git init -q -b ci-logs
+          git config user.email "ci@example.com"
+          git config user.name "CI"
+          git add -A
+          git commit -q -m "ci: logs for $RUN_NUMBER"
+          git remote add origin "https://x-access-token:${GH_TOKEN}@github.com/${REPO}.git"
+          git push -q --force origin ci-logs
+
+      - name: Upload logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-logs
+          path: |
+            check.log
+            clippy.log
+            test.log
+          if-no-files-found: ignore
+          retention-days: 14
+
+      - name: Fail if anything failed
+        if: always()
+        env:
+          CHECK: ${{ steps.check.outcome }}
+          TEST: ${{ steps.test.outcome }}
+        run: |
+          echo "check=$CHECK test=$TEST"
+          if [ "$CHECK" != "success" ] || [ "$TEST" != "success" ]; then
+            echo "::error::cargo check or cargo test failed"
+            exit 1
+          fi
+
+  smoke:
+    name: Launch smoke test (headless renderer)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends \
+            libasound2-dev libudev-dev pkg-config libwayland-dev libxkbcommon-dev \
+            mesa-vulkan-drivers libvulkan1 vulkan-tools libx11-dev libxi-dev \
+            xvfb
+          sudo apt-get install -y --no-install-recommends mesa-utils 2>/dev/null || true
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: linux-smoke
+      - name: Build the game binary
+        run: cargo build --bin hitman_lowpoly
+      - name: Run the real game for 300 frames
+        env:
+          HITMAN_SMOKE_FRAMES: "300"
+          RUST_BACKTRACE: full
+          WGPU_BACKEND: vulkan
+          LIBGL_ALWAYS_SOFTWARE: "1"
+          RUST_LOG: info
+        run: |
+          set -o pipefail
+          # Software Vulkan (lavapipe) inside a virtual X server: this exercises
+          # the full engine — window, renderer, all gameplay plugins — with no GPU.
+          xvfb-run -a -s "-screen 0 1600x900x24" \
+            vulkaninfo --summary > /dev/null 2>&1 || echo "vulkaninfo unavailable (continuing)"
+          timeout 600 xvfb-run -a -s "-screen 0 1600x900x24" \
+            ./target/debug/hitman_lowpoly 2>&1 | tee smoke.log
+          grep -q "SMOKE OK" smoke.log || { echo "::error::game did not reach the smoke-test exit"; tail -50 smoke.log; exit 1; }
+          grep -q "npcs [1-9]" smoke.log || { echo "::error::no NPCs were spawned"; exit 1; }
+          echo "smoke test passed"
+      - name: Publish smoke log
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.sha }}
+        run: |
+          python3 - <<'PY'
+          import json, os, urllib.request
+          if not os.path.exists("smoke.log"):
+              raise SystemExit(0)
+          lines = open("smoke.log", errors="replace").read().splitlines()
+          keep = lines
+          body = "**Smoke test log** " + os.environ["SHA"][:8] + "\n```\n" + "\n".join(keep)[-30000:] + "\n```\n"
+          req = urllib.request.Request(
+              "https://api.github.com/repos/" + os.environ["REPO"] + "/commits/" + os.environ["SHA"] + "/comments",
+              data=json.dumps({"body": body[:65000]}).encode(),
+              headers={"Authorization": "Bearer " + os.environ["GH_TOKEN"],
+                       "Accept": "application/vnd.github+json",
+                       "Content-Type": "application/json", "User-Agent": "ci"},
+              method="POST")
+          try:
+              with urllib.request.urlopen(req) as r:
+                  print("posted smoke log", r.status)
+          except Exception as e:
+              print("post failed", e)
+          PY
+
+  windows:
+    name: Build Windows release
+    if: github.event_name == 'workflow_dispatch' && inputs.windows
+    runs-on: windows-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: windows-release
+      - name: cargo build --release
+        run: cargo build --release --message-format=short 2>&1 | Tee-Object -FilePath build.log
+      - name: Package
+        run: |
+          New-Item -ItemType Directory -Path dist -Force | Out-Null
+          Copy-Item target\release\hitman_lowpoly.exe dist\
+          Compress-Archive -Path dist\* -DestinationPath hitman-low-poly-windows-x86_64.zip -Force
+      - uses: actions/upload-artifact@v4
+        with:
+          name: hitman-low-poly-windows-x86_64
+          path: hitman-low-poly-windows-x86_64.zip
+          retention-days: 30

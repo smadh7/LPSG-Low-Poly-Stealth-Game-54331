@@ -1,0 +1,62 @@
+[package]
+name = "hitman_lowpoly"
+version = "1.0.0"
+edition = "2021"
+rust-version = "1.85"
+description = "HITMAN LOW-POLY — an original offline low-poly stealth sandbox built with Bevy"
+license = "MIT"
+readme = "README.md"
+
+[dependencies]
+bevy = { version = "0.16.1", default-features = false, features = [
+  "std",
+  "async_executor",
+  "multi_threaded",
+  "bevy_asset",
+  "bevy_color",
+  "bevy_core_pipeline",
+  "bevy_log",
+  "bevy_pbr",
+  "bevy_render",
+  "bevy_state",
+  "bevy_text",
+  "bevy_ui",
+  "bevy_window",
+  "bevy_winit",
+  "default_font",
+  "x11",
+  "png",
+  "hdr",
+  "tonemapping_luts",
+] }
+
+[profile.dev]
+opt-level = 1
+debug = 0
+
+[profile.dev.package."*"]
+opt-level = 3
+
+# CI only: link quickly, nothing optimised. The prebuilt `test` profile keeps
+# Bevy's own dependencies cached between runs.
+[profile.test]
+opt-level = 0
+debug = 0
+incremental = false
+
+[profile.ci]
+inherits = "test"
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+panic = "abort"
+strip = true
+
+[[bin]]
+name = "hitman_lowpoly"
+path = "src/main.rs"
+
+[lib]
+name = "hitman_lowpoly"
+path = "src/lib.rs"
