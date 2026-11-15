@@ -58,9 +58,20 @@ pub const EXPOSURE: Exposure = Exposure { ev100: 13.6 };
 /// Sunlight on a clear tropical afternoon, in lux.
 pub const SUN_LUX: f32 = 82_000.0;
 
-/// Exposure used indoors, where the eye adapts to fixtures of a few hundred lux
-/// rather than an 82,000 lux sun. Roughly a 3.5 stop difference.
-pub const INTERIOR_EXPOSURE: Exposure = Exposure { ev100: 10.0 };
+/// Exposure used indoors. The difference from [`EXPOSURE`] is deliberately
+/// small: a resort lobby is a glazed, daylit atrium, not a cellar, so it needs
+/// roughly one stop more than the terrace rather than four.
+pub const INTERIOR_EXPOSURE: Exposure = Exposure { ev100: 12.6 };
+
+/// Sky/bounce contribution used outdoors and indoors.
+///
+/// The sky probe is a full 9,000 cd/m² environment. Outdoors the sun is 20x
+/// brighter again so it dominates; indoors there is no sun, and an undimmed
+/// probe floods every room to white. These values keep rooms lit but shaded.
+pub const SKY_PROBE_OUTDOOR: f32 = 6_000.0;
+pub const SKY_PROBE_INDOOR: f32 = 3_200.0;
+pub const AMBIENT_OUTDOOR: f32 = 700.0;
+pub const AMBIENT_INDOOR: f32 = 1_100.0;
 
 /// Luminance of the sky, in cd/m², on a clear tropical afternoon.
 ///
@@ -575,7 +586,7 @@ pub fn setup_environment(mut commands: Commands) {
     // that rather than a token value.
     commands.insert_resource(AmbientLight {
         color: Color::srgb(0.72, 0.82, 0.95),
-        brightness: 1_400.0,
+        brightness: AMBIENT_OUTDOOR,
         affects_lightmapped_meshes: false,
     });
 
@@ -633,7 +644,7 @@ pub fn apply_sky_environment(
                 commands.entity(camera).insert(EnvironmentMapLight {
                     diffuse_map: sky.diffuse.clone(),
                     specular_map: sky.specular.clone(),
-                    intensity: 15_000.0,
+                    intensity: SKY_PROBE_OUTDOOR,
                     rotation: Quat::IDENTITY,
                     affects_lightmapped_mesh_diffuse: true,
                 });
@@ -704,14 +715,33 @@ pub fn apply_post_processing(
 pub fn toggle_fog_by_zone(
     mut commands: Commands,
     zone: Option<Res<super::PlayerZone>>,
-    cameras: Query<(Entity, Option<&DistanceFog>), With<Camera3d>>,
+    mut ambient: ResMut<AmbientLight>,
+    mut cameras: Query<(Entity, Option<&DistanceFog>), With<Camera3d>>,
+    mut models: Query<&mut EnvironmentMapLight>,
 ) {
     let Some(zone) = zone else { return };
+    if models.is_empty() {
+        return;
+    }
     let indoor = zone.current.map(|z| z.is_interior()).unwrap_or(false);
     for (camera, fog) in &cameras {
-        if indoor && fog.is_some() {
-            commands.entity(camera).remove::<DistanceFog>();
-        } else if !indoor && fog.is_none() {
+        if indoor {
+            if fog.is_some() {
+                commands.entity(camera).remove::<DistanceFog>();
+            }
+            // Dim the sky probe so the room is lit, not flooded. This is a
+            // field assignment rather than a component swap, so it costs nothing
+            // per frame and never churns archetypes.
+            for mut light in &mut models {
+                light.intensity = SKY_PROBE_INDOOR;
+            }
+            let _ = camera;
+        } else {
+            for mut light in &mut models {
+                light.intensity = SKY_PROBE_OUTDOOR;
+            }
+        }
+        if !indoor && fog.is_none() {
             commands.entity(camera).insert(DistanceFog {
                 color: fog_color(),
                 falloff: FogFalloff::ExponentialSquared { density: 0.0016 },
@@ -720,6 +750,10 @@ pub fn toggle_fog_by_zone(
                 ..default()
             });
         }
+    }
+    let target = if indoor { AMBIENT_INDOOR } else { AMBIENT_OUTDOOR };
+    if (ambient.brightness - target).abs() > 1.0 {
+        ambient.brightness = target;
     }
 }
 
