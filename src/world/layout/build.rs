@@ -54,7 +54,7 @@ pub fn build() -> ResortLayout {
     // ARRIVAL: drive, porte-cochere, forecourt
     // =======================================================================
     b.slab("Arrival Drive", Vec2::new(-13.0, 26.0), Vec2::new(13.0, 62.0), 0.0, 0.06, MatId::Asphalt);
-    b.detail(Vec3::new(0.0, 0.07, 44.0), Vec3::new(26.0, 0.02, 36.0), MatId::Asphalt);
+    b.detail(Vec3::new(0.0, 0.075, 44.0), Vec3::new(26.0, 0.03, 36.0), MatId::Asphalt);
     b.slab("Forecourt Kerb L", Vec2::new(-14.0, 26.0), Vec2::new(-13.0, 62.0), 0.0, 0.18, MatId::Limestone);
     b.slab("Forecourt Kerb R", Vec2::new(13.0, 26.0), Vec2::new(14.0, 62.0), 0.0, 0.18, MatId::Limestone);
 
@@ -225,16 +225,16 @@ pub fn build() -> ResortLayout {
     b.slab("Lobby Ceiling", Vec2::new(-12.0, -10.0), Vec2::new(12.0, 12.0), LOBBY_CEILING, LOBBY_CEILING + 0.3, MatId::Plaster);
     for x in [-7.0_f32, 0.0, 7.0] {
         for z in [-6.0_f32, 0.0, 6.0] {
-            b.detail(Vec3::new(x, LOBBY_CEILING - 0.08, z), Vec3::new(3.2, 0.08, 2.0), MatId::WhitePaint);
+            b.detail(Vec3::new(x, LOBBY_CEILING - 0.16, z), Vec3::new(3.2, 0.10, 2.0), MatId::WhitePaint);
         }
     }
     // Feature chandelier over the lobby centre.
     b.detail(Vec3::new(0.0, LOBBY_CEILING - 0.9, 2.0), Vec3::new(2.6, 0.25, 2.6), MatId::Brass);
 
     // Marble carpet inlays and the reception area.
-    b.detail(Vec3::new(0.0, 0.012, -2.0), Vec3::new(9.0, 0.02, 9.0), MatId::Marble);
+    b.detail(Vec3::new(0.0, 0.035, -2.0), Vec3::new(9.0, 0.03, 9.0), MatId::Marble);
     b.slab("Reception Desk", Vec2::new(-7.6, 6.4), Vec2::new(-2.4, 7.6), 0.0, 1.12, MatId::Wood);
-    b.detail(Vec3::new(-5.0, 1.14, 7.0), Vec3::new(5.0, 0.04, 1.1), MatId::Marble);
+    b.detail(Vec3::new(-5.0, 1.16, 7.0), Vec3::new(5.0, 0.05, 1.1), MatId::Marble);
     b.slab("Reception Back Wall", Vec2::new(-7.8, 8.2), Vec2::new(-2.2, 8.6), 0.0, 3.2, MatId::Wood);
     b.deco(DecoKind::Reception, Vec3::new(-5.0, 0.0, 7.0), 0.0, 1.0);
 
@@ -637,7 +637,7 @@ pub fn build() -> ResortLayout {
     b.deco(DecoKind::AirUnit, Vec3::new(-33.0, svc + 2.4, 6.0), 0.0, 1.0);
     // Ceiling strip lights.
     for z in [-24.0_f32, -16.0, -8.0, 0.0, 8.0, 16.0] {
-        b.detail(Vec3::new(-39.0, svc + 3.92, z), Vec3::new(1.2, 0.08, 3.0), MatId::WhitePaint);
+        b.detail(Vec3::new(-39.0, svc + 3.86, z), Vec3::new(1.2, 0.10, 3.0), MatId::WhitePaint);
     }
 
     // =======================================================================

@@ -716,7 +716,7 @@ pub fn toggle_fog_by_zone(
     mut commands: Commands,
     zone: Option<Res<super::PlayerZone>>,
     mut ambient: ResMut<AmbientLight>,
-    mut cameras: Query<(Entity, Option<&DistanceFog>), With<Camera3d>>,
+    cameras: Query<(Entity, Option<&DistanceFog>), With<Camera3d>>,
     mut models: Query<&mut EnvironmentMapLight>,
 ) {
     let Some(zone) = zone else { return };

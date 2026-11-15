@@ -169,10 +169,15 @@ impl MaterialLibrary {
             // Per-material overrides that the maps cannot express.
             match mat {
                 MatId::Glass => {
+                    // Architectural glazing: mostly a mirror-like surface with a
+                    // faint tint. A dark base colour with alpha blending renders
+                    // as a black hole because there is nothing behind it.
                     material.alpha_mode = AlphaMode::Blend;
-                    material.perceptual_roughness = 0.05;
+                    material.base_color = Color::srgba(0.62, 0.74, 0.78, 0.34);
+                    material.perceptual_roughness = 0.06;
                     material.metallic = 0.0;
-                    material.reflectance = 0.6;
+                    material.reflectance = 0.7;
+                    material.emissive = LinearRgba::new(90.0, 130.0, 150.0, 1.0);
                 }
                 MatId::Marble => {
                     // Polished stone: a clean specular highlight, but rough
