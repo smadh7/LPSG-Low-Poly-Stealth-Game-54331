@@ -181,7 +181,7 @@ jobs:
 
   smoke:
     name: Launch smoke test (headless renderer)
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-22.04
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
@@ -196,10 +196,8 @@ jobs:
           # Ubuntu 24.04 renamed several packages for the time_t transition. A
           # single apt-get line fails wholesale if any name is wrong, so each
           # optional package is installed on its own and failures are tolerated.
-          for pkg in libxkbcommon-x11-0t64 libxkbcommon-x11-0 libxkbcommon0t64 \
-                     libx11-xcb1 libxcb1 libxcb-keysyms1; do
-            sudo apt-get install -y --no-install-recommends "$pkg" || true
-          done
+          sudo apt-get install -y --no-install-recommends libxkbcommon-x11-0 \
+            libx11-xcb1 libxcb1 libxcb-keysyms1 || true
           # If apt cannot supply it, take the .deb straight from the Ubuntu
           # archive and unpack it into /usr/lib (no dependency solving needed:
           # it only requires libxkbcommon0, which is already present).
