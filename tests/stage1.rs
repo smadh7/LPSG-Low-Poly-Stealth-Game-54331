@@ -196,14 +196,17 @@ fn player_can_climb_the_penthouse_stair() {
     // The restricted penthouse is 29.8 m up a 72-step staircase.
     let mut app = physics_app(Vec3::new(-30.5, 0.0, 24.0));
     app.add_systems(FixedUpdate, hitman_lowpoly::player::movement::player_physics);
-    for _ in 0..2400 {
+    // Only walk as far as the terrace: the test asserts the climb, and the
+    // terrace's north edge is open, so an unbounded walk would fall off it.
+    let mut highest: f32 = f32::MIN;
+    for _ in 0..900 {
         app.world_mut().resource_mut::<PlayerIntent>().direction = Vec3::Z;
         step(&mut app, 1);
+        highest = highest.max(player_transform(&mut app).y);
     }
-    let position = player_transform(&mut app);
     assert!(
-        position.y > 25.0,
-        "player should climb towards the penthouse terrace, pos={position:?}"
+        highest > 25.0,
+        "player should climb towards the penthouse terrace, highest y={highest}"
     );
 }
 
