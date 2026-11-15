@@ -126,6 +126,51 @@ pub fn palm(m: &mut MeshBuilder, origin: Vec3, yaw: f32, scale: f32, seed: u32) 
     }
 }
 
+/// Broadleaf shade tree: trunk, three main branches and layered canopy blobs.
+pub fn tree(m: &mut MeshBuilder, origin: Vec3, yaw: f32, scale: f32, seed: u32) {
+    let height = (4.4 + rand01(seed) * 1.8) * scale;
+    m.add_taper(MatId::PalmBark, origin, 0.30 * scale, 0.17 * scale, height, 10);
+    for i in 0..3 {
+        let a = yaw + i as f32 * TAU / 3.0;
+        let start = origin + Vec3::Y * height * 0.62;
+        let end = start + Vec3::new(a.cos() * 1.1, 1.0, a.sin() * 1.1) * scale;
+        let mid = (start + end) * 0.5;
+        m.add_sphere(MatId::PalmBark, mid, Vec3::new(0.10, 0.55, 0.10) * scale, 4, 6);
+    }
+
+    // Canopy: overlapping ellipsoids at three radii for a soft silhouette.
+    let canopy_center = origin + Vec3::Y * (height * 1.05);
+    let blobs = 7;
+    for i in 0..blobs {
+        let a = yaw + i as f32 * TAU / blobs as f32 + rand01(seed.wrapping_add(i)) * 0.5;
+        let r = (0.6 + rand01(seed.wrapping_add(i * 31)) * 0.9) * scale;
+        let y = (rand01(seed.wrapping_add(i * 17)) - 0.4) * 1.5 * scale;
+        m.add_sphere(
+            MatId::Hedge,
+            canopy_center + Vec3::new(a.cos() * r, y, a.sin() * r),
+            Vec3::new(1.35, 1.05, 1.35) * scale,
+            6,
+            9,
+        );
+    }
+}
+
+/// Dense tropical shrub: several overlapping leafy masses.
+pub fn shrub_cluster(m: &mut MeshBuilder, origin: Vec3, yaw: f32, scale: f32, seed: u32) {
+    for i in 0..5 {
+        let a = yaw + i as f32 * TAU / 5.0 + rand01(seed.wrapping_add(i)) * 0.8;
+        let r = (0.3 + rand01(seed.wrapping_add(i * 9)) * 0.55) * scale;
+        let h = (0.55 + rand01(seed.wrapping_add(i * 3)) * 0.5) * scale;
+        m.add_sphere(
+            MatId::Hedge,
+            origin + Vec3::new(a.cos() * r, h * 0.55, a.sin() * r),
+            Vec3::new(0.75, h, 0.75) * scale,
+            5,
+            8,
+        );
+    }
+}
+
 /// A clump of tall grass blades.
 pub fn grass_tuft(m: &mut MeshBuilder, origin: Vec3, yaw: f32, scale: f32, seed: u32) {
     let blades = 12;

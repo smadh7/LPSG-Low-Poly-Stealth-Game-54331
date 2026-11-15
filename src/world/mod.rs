@@ -48,6 +48,7 @@ impl Plugin for WorldPlugin {
                 (
                     environment::setup_environment,
                     environment::build_sky_images,
+                    update_player_zone,
                     environment::apply_shadow_settings,
                 )
                     .chain()
@@ -56,6 +57,7 @@ impl Plugin for WorldPlugin {
             .add_systems(
                 Update,
                 (
+                    update_player_zone,
                     environment::apply_shadow_settings,
                     environment::apply_post_processing,
                     environment::apply_sky_environment,
@@ -112,6 +114,35 @@ fn setup_world(
         layout.lights.len()
     );
     commands.insert_resource(ActiveMap { layout });
+}
+
+/// Keep [`PlayerZone`] in sync with where the player is standing.
+///
+/// Several systems depend on this (eye adaptation, the trespass timer, the HUD
+/// zone readout), so it is computed once here rather than in each of them.
+fn update_player_zone(
+    time: Res<Time>,
+    mut zone: ResMut<PlayerZone>,
+    collision: Option<Res<WorldCollision>>,
+    player: Query<&Transform, With<crate::player::character::PlayerAvatar>>,
+    pause: Option<Res<State<crate::PauseState>>>,
+) {
+    let Some(collision) = collision else { return };
+    let Ok(transform) = player.single() else { return };
+    let point = Vec2::new(transform.translation.x, transform.translation.z);
+    let found = collision.zone_at(point);
+    zone.current = Some(found);
+    // Restricted zones fill the trespass meter, which existing gameplay reads.
+    if found.is_restricted() {
+        let paused = pause
+            .map(|p| *p.get() != crate::PauseState::Running)
+            .unwrap_or(false);
+        if !paused {
+            zone.trespass_timer += time.delta_secs();
+        }
+    } else {
+        zone.trespass_timer = 0.0;
+    }
 }
 
 /// Despawn all entities tagged with [`LevelEntity`].

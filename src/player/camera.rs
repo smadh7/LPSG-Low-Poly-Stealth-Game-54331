@@ -120,9 +120,9 @@ pub fn eye_adaptation(
         .map(|z| z.is_interior())
         .unwrap_or(false);
     let target = if interior {
-        crate::world::environment::INTERIOR_EXPOSURE
+        crate::world::environment::INTERIOR_EXPOSURE.ev100
     } else {
-        crate::world::environment::EXPOSURE
+        crate::world::environment::EXPOSURE.ev100
     };
     let value = current.get_or_insert(target);
     let dt = time.delta_secs().min(0.2);
