@@ -91,14 +91,31 @@ pub fn camera_look(
     intent.look += delta;
 }
 
+/// Overrides the follow camera entirely.
+///
+/// Used by the screenshot harness (and available for future cinematic beats):
+/// when present, `camera_follow` leaves the camera exactly where the lock says
+/// it should be. Owning the pose through the camera's own resource is
+/// order-independent, unlike writing the transform from another system.
+#[derive(Resource, Debug, Clone, Copy)]
+pub struct CameraLock(pub Vec3, pub f32, pub f32);
+
 /// Move the camera towards its ideal position, avoiding geometry.
 pub fn camera_follow(
     time: Res<Time>,
     mut rig: ResMut<CameraRig>,
     collision: Option<Res<WorldCollision>>,
+    lock: Option<Res<CameraLock>>,
     mut camera: Query<&mut Transform, (With<ThirdPersonCamera>, Without<PlayerAvatar>)>,
     player: Query<(&Transform, &ActorBody), With<PlayerAvatar>>,
 ) {
+    if let Some(lock) = lock.as_ref() {
+        if let Ok(mut transform) = camera.single_mut() {
+            transform.translation = lock.0;
+            transform.rotation = Quat::from_euler(EulerRot::YXZ, lock.1, lock.2, 0.0);
+        }
+        return;
+    }
     let Ok((player_transform, body)) = player.single() else {
         return;
     };

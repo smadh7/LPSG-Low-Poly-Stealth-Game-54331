@@ -41,7 +41,7 @@ pub mod world;
 use bevy::{prelude::*, window::CursorGrabMode};
 
 use bevy::render::view::screenshot::{save_to_disk, Screenshot};
-use player::camera::ThirdPersonCamera;
+use player::camera::{CameraLock, ThirdPersonCamera};
 use player::character;
 
 /// Top level application flow.
@@ -139,9 +139,9 @@ impl Plugin for GamePlugin {
         // the render world.
         .add_systems(
             Update,
-            capture_lock_camera.after(player::camera::camera_follow),
+            capture_lock_camera,
         )
-        .add_systems(Update, capture_tick)
+        .add_systems(Update, (capture_tick, capture_apply_exposure))
         .add_systems(Update, character::sync_body_parts);
     }
 }
@@ -253,36 +253,34 @@ impl CaptureQueue {
     }
 }
 
-/// Park the camera at the current pose *after* every gameplay camera system has
-/// run, so the follow camera cannot drift the shot.
-fn capture_lock_camera(
-    mut commands: Commands,
-    mut camera: Query<(Entity, &mut Transform), With<ThirdPersonCamera>>,
-    all_cameras: Query<Entity, (With<Camera3d>, Without<ThirdPersonCamera>)>,
-    mut warned: Local<bool>,
-    queue: Option<Res<CaptureQueue>>,
-) {
-    if !*warned && !all_cameras.is_empty() {
-        *warned = true;
-        info!("CAPTURE note: {} extra 3D cameras present", all_cameras.iter().count());
-    }
+/// Publish the current viewpoint to the camera. `camera_follow` honours the
+/// lock directly, so no system ordering is involved.
+fn capture_lock_camera(mut commands: Commands, queue: Option<Res<CaptureQueue>>) {
     let Some(queue) = queue else { return };
     if queue.phase == CapturePhase::Finished {
         return;
     }
-    let Some(shot) = queue.current() else { return };
-    let found = camera.iter_mut().next();
-    if found.is_none() && !*warned {
-        *warned = true;
-        info!("CAPTURE: no third-person camera found");
-    }
-    if let Some((entity, mut transform)) = found {
-        transform.translation = shot.eye;
-        transform.rotation = Quat::from_euler(EulerRot::YXZ, shot.yaw, shot.pitch, 0.0);
+    if let Some(shot) = queue.current() {
+        commands.insert_resource(CameraLock(shot.eye, shot.yaw, shot.pitch));
         if let Some(ev100) = shot.ev100 {
-            commands
-                .entity(entity)
-                .insert(bevy::render::camera::Exposure { ev100 });
+            commands.insert_resource(CaptureExposure(ev100));
+        }
+    }
+}
+
+/// Exposure override requested by the current capture shot.
+#[derive(Resource, Debug, Clone, Copy)]
+pub struct CaptureExposure(pub f32);
+
+/// Applies a per-shot exposure override so a single run can bracket brightness.
+fn capture_apply_exposure(
+    exposure: Option<Res<CaptureExposure>>,
+    mut cameras: Query<&mut bevy::render::camera::Exposure, With<ThirdPersonCamera>>,
+) {
+    let Some(exposure) = exposure else { return };
+    for mut current in &mut cameras {
+        if current.ev100 != exposure.0 {
+            current.ev100 = exposure.0;
         }
     }
 }
