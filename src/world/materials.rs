@@ -21,7 +21,7 @@ use bevy::{
 use super::mesh_kit::MatId;
 
 /// Where the generated texture maps live, relative to the executable.
-pub const TEXTURE_DIR: &str = "assets/textures";
+pub const TEXTURE_DIR: &str = "textures";
 
 /// Metres covered by one texture repeat, per material.
 fn tiling(mat: MatId) -> Vec2 {

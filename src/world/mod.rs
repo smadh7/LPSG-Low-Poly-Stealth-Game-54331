@@ -41,6 +41,7 @@ impl Plugin for WorldPlugin {
         app.init_resource::<GraphicsSettings>()
             .init_resource::<PlayerZone>()
             .add_plugins(WaterPlugin)
+            .add_systems(PreStartup, water::plugin)
             .add_systems(PreStartup, (load_material_library, setup_world).chain())
             .add_systems(
                 Startup,

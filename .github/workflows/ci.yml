@@ -122,6 +122,49 @@ jobs:
           if-no-files-found: ignore
           retention-days: 14
 
+      - name: Render level screenshots
+        if: always()
+        timeout-minutes: 30
+        env:
+          HITMAN_SMOKE_FRAMES: "0"
+        run: |
+          set -x
+          # A handful of viewpoints used to verify the level visually. Each run
+          # boots the real game, renders one frame and exits.
+          mkdir -p shots
+          capture() {
+            name="$1"; spec="$2"
+            HITMAN_CAPTURE="$spec" xvfb-run -a -s "-screen 0 1600x900x24" \
+              ./target/debug/hitman_lowpoly > "shots/$name.log" 2>&1 || true
+            if [ -f "captures/frame_${spec%%:*}.png" ]; then
+              mv "captures/frame_${spec%%:*}.png" "shots/$name.png"
+            fi
+          }
+          capture arrival   "150:-2,6,46,200,-0.10"
+          capture lobby     "150:0,2.2,16,185,-0.02"
+          capture gardens   "150:-12,6,-6,205,-0.16"
+          capture pool      "150:12,9,-16,215,-0.28"
+          capture restaurant "150:26,7,-26,335,-0.20"
+          ls -l shots || true
+
+      - name: Publish screenshots
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          RUN_NUMBER: ${{ github.run_number }}
+        run: |
+          set -e
+          [ -d shots ] || exit 0
+          cd shots
+          git init -q -b ci-shots
+          git config user.email "ci@example.com"
+          git config user.name "CI"
+          git add -A
+          git commit -q -m "ci: screenshots for $RUN_NUMBER" || exit 0
+          git remote add origin "https://x-access-token:${GH_TOKEN}@github.com/${REPO}.git"
+          git push -q --force origin ci-shots
+
       - name: Fail if anything failed
         if: always()
         env:

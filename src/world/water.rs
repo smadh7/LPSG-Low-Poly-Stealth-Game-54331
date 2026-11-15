@@ -28,7 +28,7 @@ pub fn animate_water(
     }
 }
 
+/// Register the water systems (called from [`super::WorldPlugin`]).
 pub fn plugin(app: &mut App) {
-    app.init_resource::<WaterClock>()
-        .add_systems(Update, animate_water);
+    app.init_resource::<WaterClock>();
 }

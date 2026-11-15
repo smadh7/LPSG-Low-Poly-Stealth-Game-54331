@@ -43,6 +43,7 @@ use bevy::{
     window::{CursorGrabMode, PresentMode, WindowResolution},
 };
 
+use bevy::render::view::screenshot::{save_to_disk, Screenshot};
 use player::character;
 
 /// Top level application flow.
@@ -121,7 +122,76 @@ impl Plugin for GamePlugin {
         .add_systems(Startup, setup_global_environment)
 
         .add_systems(Update, (handle_state_transitions, capture_cursor, log_smoke_progress))
+        .init_resource::<CaptureClock>()
+        .add_systems(Startup, capture_setup)
+        .add_systems(Update, capture_tick)
         .add_systems(Update, character::sync_body_parts);
+    }
+}
+
+/// Screenshot mode: `HITMAN_CAPTURE=frame:x,y,z,yaw` renders the game from a
+/// fixed camera on that frame, dumps it to `captures/frame_<frame>.png` and
+/// exits. It is the tool used to visually verify the level on a headless
+/// runner, and it is inert in normal play.
+fn capture_setup(
+    mut commands: Commands,
+    mut camera_query: Query<&mut Transform, With<Camera3d>>,
+    mut state: ResMut<NextState<AppState>>,
+) {
+    let Ok(spec) = std::env::var("HITMAN_CAPTURE") else {
+        return;
+    };
+    state.set(AppState::Playing);
+    // Format: frame:x,y,z,yaw[,pitch]
+    let (frame, params) = spec.split_once(':').unwrap_or(("120", spec.as_str()));
+    let values: Vec<f32> = params.split(',').filter_map(|v| v.trim().parse().ok()).collect();
+    if values.len() >= 4 {
+        let yaw = values[3].to_radians();
+        let pitch = values.get(4).copied().unwrap_or(-0.18);
+        commands.insert_resource(CaptureRequest {
+            frame: frame.trim().parse().unwrap_or(120),
+        });
+        if let Ok(mut transform) = camera_query.single_mut() {
+            transform.translation = Vec3::new(values[0], values[1], values[2]);
+            transform.rotation = Quat::from_euler(EulerRot::YXZ, yaw, pitch, 0.0);
+        }
+        info!("CAPTURE armed for frame {}", frame);
+    }
+}
+
+/// Pending screenshot request.
+#[derive(Resource)]
+pub struct CaptureRequest {
+    pub frame: u32,
+}
+
+/// Frame counter for the screenshot harness.
+#[derive(Resource, Default)]
+pub struct CaptureClock(pub u32);
+
+/// Render the requested frame, save it, then exit.
+fn capture_tick(
+    mut commands: Commands,
+    request: Option<Res<CaptureRequest>>,
+    mut clock: ResMut<CaptureClock>,
+) {
+    let Some(request) = request else {
+        return;
+    };
+    clock.0 += 1;
+    // Give the renderer a moment to build pipelines and upload the level.
+    if clock.0 == request.frame {
+        let path = format!("captures/frame_{}.png", request.frame);
+        if let Some(parent) = std::path::Path::new(&path).parent() {
+            let _ = std::fs::create_dir_all(parent);
+        }
+        commands
+            .spawn(Screenshot::primary_window())
+            .observe(save_to_disk(path.clone()));
+        info!("CAPTURE writing {path}");
+    }
+    if clock.0 == request.frame + 30 {
+        std::process::exit(0);
     }
 }
 
