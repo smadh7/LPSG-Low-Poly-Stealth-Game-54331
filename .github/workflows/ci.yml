@@ -36,6 +36,10 @@ jobs:
             || sudo apt-get install -y --no-install-recommends libxkbcommon-x11-0 \
             || echo "WARNING: libxkbcommon-x11 not installed"
           ldconfig -p | grep -i xkbcommon || echo "no xkbcommon in the loader cache"
+          # Screenshots below render on a CPU-only runner, which needs a
+          # software Vulkan implementation (lavapipe) and a virtual X server.
+          sudo apt-get install -y --no-install-recommends \
+            mesa-vulkan-drivers libvulkan1 xvfb libx11-xcb1 mesa-utils || true
 
       - uses: dtolnay/rust-toolchain@stable
         with:
