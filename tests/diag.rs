@@ -3,8 +3,8 @@
 use bevy::prelude::*;
 use hitman_lowpoly::core::Circle2;
 use hitman_lowpoly::player::movement::ground_height;
-use hitman_lowpoly::world::builder::{WorldCollision, WorldCollisionExt};
-use hitman_lowpoly::world::layout::{resort_layout, SolidSpec};
+use hitman_lowpoly::world::builder::WorldCollision;
+use hitman_lowpoly::world::layout::resort_layout;
 
 fn dump(label: &str, pos: Vec2) {
     let layout = resort_layout();
@@ -30,7 +30,6 @@ fn dump(label: &str, pos: Vec2) {
         "  ground_height(0.4) = {:?}",
         ground_height(&collision.surfaces, pos, 0.4, 0.0)
     );
-    let _ = (SolidSpec::new, WorldCollision::from_layout as fn(&_));
     let _ = Circle2 { center: pos, radius: 0.4 };
 }
 

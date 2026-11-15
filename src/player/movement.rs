@@ -122,7 +122,6 @@ pub fn player_physics(
     let moved_horizontal = current_horizontal.move_towards(desired_horizontal, accel * dt);
     body.velocity.x = moved_horizontal.x;
     body.velocity.z = moved_horizontal.z;
-    let new_horizontal = moved_horizontal;
 
     // --- Jump -----------------------------------------------------------
     if intent.wants_jump && body.grounded && !crouched {
