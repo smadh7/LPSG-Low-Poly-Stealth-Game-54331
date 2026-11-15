@@ -38,7 +38,9 @@ use bevy::{
     },
 };
 
-use bevy::core_pipeline::skybox::Skybox;
+use bevy::core_pipeline::Skybox;
+
+use super::builder::LevelEntity;
 
 /// Camera exposure for the 82,000 lux afternoon sun.
 ///
