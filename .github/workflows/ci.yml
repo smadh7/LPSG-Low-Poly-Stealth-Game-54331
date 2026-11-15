@@ -155,11 +155,13 @@ jobs:
               mv "captures/frame_${spec%%:*}.png" "shots/$name.png"
             fi
           }
-          capture arrival   "150:-2,6,46,200,-0.10"
-          capture lobby     "150:0,2.2,16,185,-0.02"
-          capture gardens   "150:-12,6,-6,205,-0.16"
-          capture pool      "150:12,9,-16,215,-0.28"
-          capture restaurant "150:26,7,-26,335,-0.20"
+          # Eye position then look-at target: "x,y,z, tx,ty,tz".
+          capture arrival   "150:0,14,-78,0,6,-6"
+          capture lobby     "150:0,2.6,20,0,2.8,-6"
+          capture gardens   "150:-20,3.5,14,6,2.5,-18"
+          capture pool      "150:36,9,-6,36,0.5,-26"
+          capture restaurant "150:48,4.5,6,32,2.2,-8"
+          capture roof      "150:-16,12,30,0,26,0"
           ls -l shots || true
 
       - name: Publish screenshots
