@@ -36,7 +36,7 @@ fn uv_scale(metres: f32) -> Vec2 {
 /// Metres covered by one texture repeat, per material.
 fn tiling(mat: MatId) -> Vec2 {
     let m = match mat {
-        MatId::Grass => 2.5,
+        MatId::Grass => 0.6,
         MatId::Sand => 3.0,
         MatId::Marble => 2.5,
         MatId::Limestone => 3.0,
@@ -52,7 +52,9 @@ fn tiling(mat: MatId) -> Vec2 {
         MatId::Roof => 4.0,
         MatId::Hedge => 1.5,
         MatId::PalmBark => 1.0,
-        MatId::Frond => 1.0,
+        // A frond map holds ~26 leaflets across its width; at 0.55 m per
+        // repeat that is roughly a 2 cm leaflet, which is right for a palm.
+        MatId::Frond => 0.55,
         MatId::Water => 8.0,
         MatId::WhitePaint => 2.0,
         MatId::DarkTrim => 1.0,

@@ -145,6 +145,10 @@ def mat_grass(size, rng):
     dark = np.array([0.052, 0.115, 0.036])
     light = np.array([0.255, 0.400, 0.120])
     s.albedo = dark + (light - dark) * tone[..., None]
+    # A real palm's leaflets vary a lot in tone: some are lit, some are in
+    # shadow. Without this variation the fronds read as flat green card.
+    shade = 0.72 + 0.55 * fbm(size, rng, 1.4, octaves=2)
+    s.albedo = np.clip(s.albedo * shade[..., None], 0.0, 1.0)
     # Sun-bleached patches.
     dry = np.clip((clumps - 0.62) * 2.4, 0.0, 1.0)[..., None]
     s.albedo = s.albedo * (1.0 - dry * 0.55) + np.array([0.360, 0.330, 0.150]) * dry * 0.55
@@ -261,6 +265,10 @@ def mat_wood(size, rng):
     dark = np.array([0.135, 0.072, 0.034])
     light = np.array([0.330, 0.190, 0.100])
     s.albedo = dark + (light - dark) * tone[..., None]
+    # A real palm's leaflets vary a lot in tone: some are lit, some are in
+    # shadow. Without this variation the fronds read as flat green card.
+    shade = 0.72 + 0.55 * fbm(size, rng, 1.4, octaves=2)
+    s.albedo = np.clip(s.albedo * shade[..., None], 0.0, 1.0)
     s.albedo = np.where(planks[..., None] > 0.5, s.albedo, s.albedo * 0.35)
     s.height = planks * 0.75 + 0.25 * fibre
     s.rough = np.where(planks > 0.5, 0.48 + 0.16 * fibre, 0.85)
@@ -392,6 +400,10 @@ def mat_hedge(size, rng):
     dark = np.array([0.018, 0.055, 0.018])
     light = np.array([0.175, 0.345, 0.105])
     s.albedo = dark + (light - dark) * tone[..., None]
+    # A real palm's leaflets vary a lot in tone: some are lit, some are in
+    # shadow. Without this variation the fronds read as flat green card.
+    shade = 0.72 + 0.55 * fbm(size, rng, 1.4, octaves=2)
+    s.albedo = np.clip(s.albedo * shade[..., None], 0.0, 1.0)
     s.albedo *= (1.0 - 0.55 * gaps)[..., None]
     s.height = 0.8 * leaves + 0.2 * clump
     s.rough = 0.72 + 0.14 * leaves
@@ -407,6 +419,10 @@ def mat_palm_bark(size, rng):
     dark = np.array([0.115, 0.080, 0.052])
     light = np.array([0.300, 0.222, 0.150])
     s.albedo = dark + (light - dark) * tone[..., None]
+    # A real palm's leaflets vary a lot in tone: some are lit, some are in
+    # shadow. Without this variation the fronds read as flat green card.
+    shade = 0.72 + 0.55 * fbm(size, rng, 1.4, octaves=2)
+    s.albedo = np.clip(s.albedo * shade[..., None], 0.0, 1.0)
     s.height = 0.75 * rings + 0.25 * grain
     s.rough = 0.82 + 0.10 * grain
     return s
@@ -428,6 +444,10 @@ def mat_frond(size, rng):
     dark = np.array([0.040, 0.090, 0.028])
     light = np.array([0.190, 0.330, 0.100])
     s.albedo = dark + (light - dark) * tone[..., None]
+    # A real palm's leaflets vary a lot in tone: some are lit, some are in
+    # shadow. Without this variation the fronds read as flat green card.
+    shade = 0.72 + 0.55 * fbm(size, rng, 1.4, octaves=2)
+    s.albedo = np.clip(s.albedo * shade[..., None], 0.0, 1.0)
     # Pale woody rachis down the middle.
     s.albedo = s.albedo * (1.0 - rib[..., None] * 0.85) + np.array([0.330, 0.300, 0.170]) * rib[..., None] * 0.85
     s.height = 0.8 * leaflet_mask + 0.2 * grain

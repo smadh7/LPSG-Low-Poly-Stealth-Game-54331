@@ -303,6 +303,20 @@ impl MeshBuilder {
         );
     }
 
+    /// Quad with explicit UVs, for surfaces that need a specific mapping
+    /// (palm fronds, posters, signage).
+    pub fn add_quad_uv(&mut self, mat: MatId, p: [Vec3; 4], uv: [[f32; 2]; 4]) {
+        let n = (p[1] - p[0]).cross(p[3] - p[0]).normalize_or_zero();
+        self.bucket(mat).quad(p, [n; 4], uv);
+    }
+
+    /// Double-sided quad with explicit UVs (thin foliage that must read from
+    /// both sides).
+    pub fn add_quad_uv_double(&mut self, mat: MatId, p: [Vec3; 4], uv: [[f32; 2]; 4]) {
+        self.add_quad_uv(mat, p, uv);
+        self.add_quad_uv(mat, [p[3], p[2], p[1], p[0]], [uv[3], uv[2], uv[1], uv[0]]);
+    }
+
     /// Arbitrary quad (e.g. a beach slope). The normal is derived from the
     /// winding order, so pass the vertices counter-clockwise when viewed from
     /// the visible side.

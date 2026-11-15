@@ -28,112 +28,101 @@ fn place(origin: Vec3, yaw: f32, local: Vec3) -> Vec3 {
 
 /// A palm: leaning tapered trunk, crown shaft, and 11 drooping fronds.
 pub fn palm(m: &mut MeshBuilder, origin: Vec3, yaw: f32, scale: f32, seed: u32) {
-    let height = (5.6 + rand01(seed) * 3.4) * scale;
-    let lean = (rand01(seed.wrapping_add(11)) - 0.5) * 0.30;
+    let height = (6.2 + rand01(seed) * 3.6) * scale;
+    let lean = (rand01(seed.wrapping_add(11)) - 0.5) * 0.26;
     let lean_dir = yaw + rand01(seed.wrapping_add(23)) * TAU;
-    let segments = 7;
+    let segments = 14;
 
-    // Trunk in segments, each offset a little further along the lean.
+    // Trunk: many short, slightly flared segments so the lean is a smooth curve
+    // and the ring texture has something to follow. The bark UVs come from the
+    // tapered cylinder primitive, which tiles at one metre.
     for i in 0..segments {
         let t0 = i as f32 / segments as f32;
         let t1 = (i + 1) as f32 / segments as f32;
         let bend = |t: f32| Vec3::new(lean_dir.cos(), 0.0, lean_dir.sin()) * (t * t * lean * height);
         let p0 = origin + Vec3::Y * (t0 * height) + bend(t0);
-        let r0 = (0.30 - 0.14 * t0) * scale;
-        let r1 = (0.30 - 0.14 * t1) * scale;
-        m.add_taper(MatId::PalmBark, p0, r0, r1, height / segments as f32 + 0.02, 8);
+        let r0 = (0.29 - 0.13 * t0) * scale;
+        let r1 = (0.29 - 0.13 * t1) * scale;
+        m.add_taper(MatId::PalmBark, p0, r0, r1, height / segments as f32 + 0.02, 12);
     }
 
     let top = origin
         + Vec3::Y * height
         + Vec3::new(lean_dir.cos(), 0.0, lean_dir.sin()) * (lean * height);
-    // Crown shaft and nut cluster.
-    m.add_sphere(MatId::PalmBark, top, Vec3::new(0.26, 0.20, 0.26) * scale, 4, 8);
-    for i in 0..4 {
-        let a = yaw + i as f32 * TAU / 4.0;
+    // Crown shaft: a smooth green bulge where the fronds attach.
+    m.add_sphere(MatId::Frond, top - Vec3::Y * 0.35 * scale, Vec3::new(0.24, 0.36, 0.24) * scale, 6, 10);
+    // Coconut cluster.
+    for i in 0..5 {
+        let a = yaw + i as f32 * TAU / 5.0 + 0.4;
         m.add_sphere(
             MatId::Hedge,
-            top + Vec3::new(a.cos() * 0.26, -0.24, a.sin() * 0.26) * scale,
-            Vec3::splat(0.15 * scale),
+            top + Vec3::new(a.cos() * 0.20, -0.30, a.sin() * 0.20) * scale,
+            Vec3::splat(0.11 * scale),
             3,
             6,
         );
     }
 
-    // Fronds: long, narrow, drooping ribbons built from quads.
-    let fronds = 11;
+    // Fronds. Each frond is a curved rachis with individual leaflets, not a
+    // solid ribbon: the silhouette (light through separate leaflets) is what
+    // makes a palm read as a palm rather than a green windmill.
+    let fronds = 13;
     for i in 0..fronds {
-        let a = yaw + i as f32 * TAU / fronds as f32 + rand01(seed.wrapping_add(i as u32)) * 0.35;
-        let droop = 0.35 + rand01(seed.wrapping_add(i as u32 * 7)) * 0.55;
-        let len = (2.5 + rand01(seed.wrapping_add(i as u32 * 13)) * 0.9) * scale;
+        let a = yaw + i as f32 * TAU / fronds as f32 + rand01(seed.wrapping_add(i as u32)) * 0.28;
+        let droop = 0.30 + rand01(seed.wrapping_add(i as u32 * 7)) * 0.60;
+        let len = (2.9 + rand01(seed.wrapping_add(i as u32 * 13)) * 1.0) * scale;
+        let ring = (i % 3) as f32;
+        let base = top - Vec3::Y * (0.10 + ring * 0.08) * scale;
         let dir = Vec3::new(a.cos(), 0.0, a.sin());
         let side = Vec3::new(-a.sin(), 0.0, a.cos());
-        let steps = 4;
-        let mut prev_center = top;
-        let mut prev_half = 0.06 * scale;
-        for s in 1..=steps {
-            let t = s as f32 / steps as f32;
-            // The frond rises then falls away: a parabola in Y.
-            let y = (t * 1.15 - t * t * (1.0 + droop)) * scale;
-            let width = (0.42 * (1.0 - t * 0.75) + 0.05) * scale;
-            let center = top + dir * (len * t) + Vec3::Y * y;
-            // Upper and lower surfaces of the leaf, so it reads from both sides.
-            let p = [
-                prev_center - side * prev_half,
-                center - side * width,
-                center + side * width,
-                prev_center + side * prev_half,
-            ];
-            m.add_quad(MatId::Frond, p);
-            m.add_quad(MatId::Frond, [p[3], p[2], p[1], p[0]]);
-            prev_center = center;
-            prev_half = width;
+
+        // Rachis: the thin woody spine the leaflets hang from.
+        let rachis_point = |t: f32| {
+            let rise = 0.52 + ring * 0.10;
+            let y = (t * rise - t * t * (0.55 + droop)) * len * 0.55;
+            base + dir * (len * t) + Vec3::Y * y
+        };
+
+        let steps = 7;
+        let mut prev = rachis_point(0.0);
+        for step in 1..=steps {
+            let t = step as f32 / steps as f32;
+            let point = rachis_point(t);
+            // Spine quad, very narrow, with a bark-ish UV run.
+            let w = 0.022 * scale * (1.0 - t * 0.6);
+            m.add_quad_uv_double(
+                MatId::PalmBark,
+                [prev - side * w, point - side * w, point + side * w, prev + side * w],
+                [
+                    [0.0, t * 2.0],
+                    [0.0, t * 2.0 + 0.3],
+                    [1.0, t * 2.0 + 0.3],
+                    [1.0, t * 2.0],
+                ],
+            );
+
+            // Leaflets: angled forward and outward, shortening towards the tip.
+            let leaflet_len = (0.62 * (1.0 - t * 0.72) + 0.06) * len * 0.42;
+            for sign in [-1.0_f32, 1.0] {
+                let outward = (side * sign * 0.72 + dir * 0.45 + Vec3::NEG_Y * 0.35).normalize();
+                let tip = point + outward * leaflet_len;
+                let root = point + side * sign * 0.02 * scale;
+                let width = 0.055 * scale * (1.0 - t * 0.5);
+                let p = [
+                    root - dir * width,
+                    tip - dir * width * 0.55,
+                    tip + dir * width * 0.55,
+                    root + dir * width,
+                ];
+                m.add_quad_uv_double(
+                    MatId::Frond,
+                    p,
+                    // Across the leaflet is 0..1; along it we walk the pattern.
+                    [[0.20, 0.0], [0.02, 0.55], [0.98, 0.55], [0.80, 0.0]],
+                );
+            }
+            prev = point;
         }
-    }
-}
-
-/// Broadleaf shade tree: trunk, three main branches and layered canopy blobs.
-pub fn tree(m: &mut MeshBuilder, origin: Vec3, yaw: f32, scale: f32, seed: u32) {
-    let height = (4.4 + rand01(seed) * 1.8) * scale;
-    m.add_taper(MatId::PalmBark, origin, 0.30 * scale, 0.17 * scale, height, 10);
-    for i in 0..3 {
-        let a = yaw + i as f32 * TAU / 3.0;
-        let start = origin + Vec3::Y * height * 0.62;
-        let end = start + Vec3::new(a.cos() * 1.1, 1.0, a.sin() * 1.1) * scale;
-        let mid = (start + end) * 0.5;
-        m.add_sphere(MatId::PalmBark, mid, Vec3::new(0.10, 0.55, 0.10) * scale, 4, 6);
-    }
-
-    // Canopy: overlapping ellipsoids at three radii for a soft silhouette.
-    let canopy_center = origin + Vec3::Y * (height * 1.05);
-    let blobs = 7;
-    for i in 0..blobs {
-        let a = yaw + i as f32 * TAU / blobs as f32 + rand01(seed.wrapping_add(i)) * 0.5;
-        let r = (0.6 + rand01(seed.wrapping_add(i * 31)) * 0.9) * scale;
-        let y = (rand01(seed.wrapping_add(i * 17)) - 0.4) * 1.5 * scale;
-        m.add_sphere(
-            MatId::Hedge,
-            canopy_center + Vec3::new(a.cos() * r, y, a.sin() * r),
-            Vec3::new(1.35, 1.05, 1.35) * scale,
-            6,
-            9,
-        );
-    }
-}
-
-/// Dense tropical shrub: several overlapping leafy masses.
-pub fn shrub_cluster(m: &mut MeshBuilder, origin: Vec3, yaw: f32, scale: f32, seed: u32) {
-    for i in 0..5 {
-        let a = yaw + i as f32 * TAU / 5.0 + rand01(seed.wrapping_add(i)) * 0.8;
-        let r = (0.3 + rand01(seed.wrapping_add(i * 9)) * 0.55) * scale;
-        let h = (0.55 + rand01(seed.wrapping_add(i * 3)) * 0.5) * scale;
-        m.add_sphere(
-            MatId::Hedge,
-            origin + Vec3::new(a.cos() * r, h * 0.55, a.sin() * r),
-            Vec3::new(0.75, h, 0.75) * scale,
-            5,
-            8,
-        );
     }
 }
 
@@ -147,9 +136,17 @@ pub fn grass_tuft(m: &mut MeshBuilder, origin: Vec3, yaw: f32, scale: f32, seed:
         let tip = origin + offset + Vec3::new(a.cos() * 0.22, h, a.sin() * 0.22) * scale;
         let base = origin + offset;
         let side = Vec3::new(-a.sin(), 0.0, a.cos()) * 0.035 * scale;
-        m.add_quad(
+        // Slight cross-blade so the tuft has volume from every direction.
+        let cross = Vec3::new(a.cos(), 0.0, a.sin()) * 0.030 * scale;
+        m.add_quad_uv_double(
             MatId::Grass,
             [base - side, base + side, tip + side * 0.3, tip - side * 0.3],
+            [[0.0, 0.0], [0.5, 0.0], [0.62, 1.0], [0.10, 1.0]],
+        );
+        m.add_quad_uv_double(
+            MatId::Grass,
+            [base - cross, base + cross, tip + cross * 0.3, tip - cross * 0.3],
+            [[0.0, 0.0], [0.5, 0.0], [0.62, 1.0], [0.10, 1.0]],
         );
     }
 }

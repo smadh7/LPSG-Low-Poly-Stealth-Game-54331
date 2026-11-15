@@ -520,10 +520,29 @@ pub fn build() -> ResortLayout {
     ] {
         b.deco(DecoKind::ShrubCluster, Vec3::new(x, 0.0, z), 0.0, 1.0);
     }
-    for i in 0..18 {
-        let x = -52.0 + (i as f32 * 6.1) % 104.0;
-        let z = -48.0 - (i as f32 * 1.7) % 6.0;
-        b.deco(DecoKind::GrassTuft, Vec3::new(x, 0.0, z), i as f32, 1.0);
+    // Dense ground cover: grass tufts along the verges, the beach edge and the
+    // garden beds. Scattered pseudo-randomly with a fixed seed so the layout is
+    // deterministic (and therefore testable).
+    let mut seed = 0x5eed_u32;
+    let mut rng = || {
+        seed = seed.wrapping_mul(1_664_525).wrapping_add(1_013_904_223);
+        (seed >> 8) as f32 / 16_777_216.0
+    };
+    for _ in 0..260 {
+        let x = -70.0 + rng() * 140.0;
+        let z = -56.0 + rng() * 42.0;
+        // Keep the paths, the pool deck and the buildings clear.
+        if x.abs() < 4.5 && z > -30.0 {
+            continue;
+        }
+        if (16.0..58.0).contains(&x) && (-34.0..-16.0).contains(&z) {
+            continue;
+        }
+        if (-29.0..29.0).contains(&x) && (-14.0..26.0).contains(&z) {
+            continue;
+        }
+        let s = 0.7 + rng() * 0.9;
+        b.deco(DecoKind::GrassTuft, Vec3::new(x, 0.0, z), rng() * 6.28, s);
     }
 
     // Lamp posts along the paths.
