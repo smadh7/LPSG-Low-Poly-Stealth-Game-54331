@@ -129,6 +129,7 @@ jobs:
           HITMAN_ASSET_ROOT: ${{ github.workspace }}/assets
         run: |
           set -x
+          ldconfig -p | grep -i xkbcommon || true
           # A handful of viewpoints used to verify the level visually. Each run
           # boots the real game, renders one frame and exits.
           mkdir -p shots
@@ -192,6 +193,9 @@ jobs:
             mesa-vulkan-drivers libvulkan1 vulkan-tools libx11-dev libxi-dev \
             xvfb
           sudo apt-get install -y --no-install-recommends mesa-utils 2>/dev/null || true
+          # Diagnostics: prove the X keymap library really is present.
+          ldconfig -p | grep -i xkbcommon || true
+          dpkg -L libxkbcommon-x11-0 | grep '\.so' || true
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
         with:
