@@ -61,6 +61,7 @@ impl Plugin for WorldPlugin {
                     environment::apply_shadow_settings,
                     environment::apply_post_processing,
                     environment::apply_sky_environment,
+                    environment::toggle_fog_by_zone,
                     water::animate_water,
                 ),
             );

@@ -29,7 +29,7 @@ use bevy::{
     image::{ImageAddressMode, ImageFilterMode, ImageSampler, ImageSamplerDescriptor},
     pbr::{
         prelude::EnvironmentMapLight, CascadeShadowConfig, CascadeShadowConfigBuilder,
-        DirectionalLightShadowMap,
+        DirectionalLightShadowMap, DistanceFog, FogFalloff,
     },
     prelude::*,
     render::{
@@ -666,10 +666,10 @@ pub fn apply_post_processing(
             // it; a threshold near 1.0 blooms every sunlit wall.
             camera.insert(Bloom {
                 prefilter: bevy::core_pipeline::bloom::BloomPrefilter {
-                    threshold: 1.35,
-                    threshold_softness: 0.6,
+                    threshold: 3.0,
+                    threshold_softness: 0.8,
                 },
-                intensity: 0.06,
+                intensity: 0.045,
                 ..Bloom::NATURAL
             });
         } else {
@@ -693,6 +693,32 @@ pub fn apply_post_processing(
         }
         if let Projection::Perspective(perspective) = &mut *projection {
             perspective.far = settings.draw_distance.max(120.0);
+        }
+    }
+}
+
+/// Distance haze, applied outdoors only.
+///
+/// Haze in a 6 m lobby is both physically wrong and visually muddy, so the fog
+/// component is added and removed as the player moves between zones.
+pub fn toggle_fog_by_zone(
+    mut commands: Commands,
+    zone: Option<Res<super::PlayerZone>>,
+    cameras: Query<(Entity, Option<&DistanceFog>), With<Camera3d>>,
+) {
+    let Some(zone) = zone else { return };
+    let indoor = zone.current.map(|z| z.is_interior()).unwrap_or(false);
+    for (camera, fog) in &cameras {
+        if indoor && fog.is_some() {
+            commands.entity(camera).remove::<DistanceFog>();
+        } else if !indoor && fog.is_none() {
+            commands.entity(camera).insert(DistanceFog {
+                color: fog_color(),
+                falloff: FogFalloff::ExponentialSquared { density: 0.0016 },
+                directional_light_color: fog_sun_color(),
+                directional_light_exponent: 12.0,
+                ..default()
+            });
         }
     }
 }

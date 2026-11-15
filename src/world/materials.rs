@@ -175,8 +175,13 @@ impl MaterialLibrary {
                     material.reflectance = 0.6;
                 }
                 MatId::Marble => {
-                    // Polished stone: strong specular response, no metal.
-                    material.reflectance = 0.55;
+                    // Polished stone: a clean specular highlight, but rough
+                    // enough that it is not a mirror of the sky.
+                    material.reflectance = 0.4;
+                    material.perceptual_roughness = 0.85;
+                }
+                MatId::Travertine | MatId::Limestone | MatId::Concrete => {
+                    material.perceptual_roughness = 0.95;
                 }
                 MatId::Metal | MatId::Brass => {
                     material.reflectance = 0.9;
