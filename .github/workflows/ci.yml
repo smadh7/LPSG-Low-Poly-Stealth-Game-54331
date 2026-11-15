@@ -29,6 +29,13 @@ jobs:
           sudo apt-get update -qq
           sudo apt-get install -y --no-install-recommends \
             libasound2-dev libudev-dev pkg-config libwayland-dev libxkbcommon-dev
+          # Rendering needs a window, and winit's X11 backend requires this
+          # library at runtime. Ubuntu 24.04 renamed it for the time_t
+          # transition, so try both spellings and report what we ended up with.
+          sudo apt-get install -y --no-install-recommends libxkbcommon-x11-0t64 \
+            || sudo apt-get install -y --no-install-recommends libxkbcommon-x11-0 \
+            || echo "WARNING: libxkbcommon-x11 not installed"
+          ldconfig -p | grep -i xkbcommon || echo "no xkbcommon in the loader cache"
 
       - uses: dtolnay/rust-toolchain@stable
         with:
@@ -235,8 +242,11 @@ jobs:
           # the full engine — window, renderer, all gameplay plugins — with no GPU.
           xvfb-run -a -s "-screen 0 1600x900x24" \
             vulkaninfo --summary > /dev/null 2>&1 || echo "vulkaninfo unavailable (continuing)"
+          { echo "=== xkbcommon diagnostics"; ldconfig -p | grep -i xkbcommon;
+            ls -l /usr/lib/x86_64-linux-gnu/libxkbcommon* 2>&1;
+            apt-cache policy libxkbcommon-x11-0 libxkbcommon-x11-0t64 2>&1; } | tee smoke.log
           timeout 600 xvfb-run -a -s "-screen 0 1600x900x24" \
-            ./target/debug/hitman_lowpoly 2>&1 | tee smoke.log
+            ./target/debug/hitman_lowpoly 2>&1 | tee -a smoke.log
           grep -q "SMOKE OK" smoke.log || { echo "::error::game did not reach the smoke-test exit"; tail -50 smoke.log; exit 1; }
           grep -q "npcs [1-9]" smoke.log || { echo "::error::no NPCs were spawned"; exit 1; }
           echo "smoke test passed"
