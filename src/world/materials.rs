@@ -51,8 +51,9 @@ fn tiling(mat: MatId) -> Vec2 {
         MatId::StoneWall => 2.5,
         MatId::Roof => 4.0,
         MatId::Hedge => 1.5,
-        // Bark rings every 40 cm: the generated bark map has ~2 rings per tile.
-        MatId::PalmBark => 0.8,
+        // Bark rings every 1.6 m. Finer than this and the trunk visibly moirés
+        // from a few metres away.
+        MatId::PalmBark => 1.6,
         // A frond map holds ~26 leaflets across its width; at 0.55 m per
         // repeat that is roughly a 2 cm leaflet, which is right for a palm.
         MatId::Frond => 0.75,
@@ -208,12 +209,24 @@ impl MaterialLibrary {
                     material.metallic = 0.0;
                     material.perceptual_roughness = 1.0;
                 }
-                MatId::Frond | MatId::Hedge | MatId::Grass => {
+                MatId::Frond => {
+                    // Leaves are thin enough to transmit light, so their shaded
+                    // underside is never black. Bevy's standard material has no
+                    // translucency, so a low emissive term stands in for it —
+                    // without this the crowns read as dark wire against the sky.
+                    material.metallic = 0.0;
+                    material.perceptual_roughness = 0.85;
+                    material.double_sided = true;
+                    material.cull_mode = None;
+                    material.emissive = LinearRgba::new(320.0, 620.0, 170.0, 1.0);
+                }
+                MatId::Hedge | MatId::Grass => {
                     // Foliage: diffuse, slightly waxy, no metal response.
                     material.metallic = 0.0;
                     material.perceptual_roughness = 1.0;
                     material.double_sided = true;
                     material.cull_mode = None;
+                    material.emissive = LinearRgba::new(40.0, 80.0, 24.0, 1.0);
                 }
                 _ => {}
             }
