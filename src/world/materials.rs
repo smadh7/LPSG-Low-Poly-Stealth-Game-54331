@@ -51,10 +51,11 @@ fn tiling(mat: MatId) -> Vec2 {
         MatId::StoneWall => 2.5,
         MatId::Roof => 4.0,
         MatId::Hedge => 1.5,
-        MatId::PalmBark => 1.0,
+        // Bark rings every 40 cm: the generated bark map has ~2 rings per tile.
+        MatId::PalmBark => 0.8,
         // A frond map holds ~26 leaflets across its width; at 0.55 m per
         // repeat that is roughly a 2 cm leaflet, which is right for a palm.
-        MatId::Frond => 0.55,
+        MatId::Frond => 0.75,
         MatId::Water => 8.0,
         MatId::WhitePaint => 2.0,
         MatId::DarkTrim => 1.0,

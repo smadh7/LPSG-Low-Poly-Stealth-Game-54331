@@ -101,24 +101,27 @@ pub fn palm(m: &mut MeshBuilder, origin: Vec3, yaw: f32, scale: f32, seed: u32) 
                 ],
             );
 
-            // Leaflets: angled forward and outward, shortening towards the tip.
-            let leaflet_len = (0.62 * (1.0 - t * 0.72) + 0.06) * len * 0.42;
+            // Leaflets: wide, overlapping blades angled forward and outward,
+            // shortening towards the tip. Each blade carries the whole frond
+            // texture, so it reads as a leaf rather than a green stick.
+            let taper = 1.0 - t * 0.62;
             for sign in [-1.0_f32, 1.0] {
-                let outward = (side * sign * 0.72 + dir * 0.45 + Vec3::NEG_Y * 0.35).normalize();
+                let outward =
+                    (side * sign * 0.80 + dir * 0.42 + Vec3::NEG_Y * 0.30).normalize();
+                let leaflet_len = (0.85 * taper + 0.10) * len * 0.40;
                 let tip = point + outward * leaflet_len;
-                let root = point + side * sign * 0.02 * scale;
-                let width = 0.055 * scale * (1.0 - t * 0.5);
+                let root = point + side * sign * 0.015 * scale;
+                let width = (0.14 * taper + 0.02) * scale;
                 let p = [
                     root - dir * width,
-                    tip - dir * width * 0.55,
-                    tip + dir * width * 0.55,
+                    tip - dir * width * 0.6,
+                    tip + dir * width * 0.6,
                     root + dir * width,
                 ];
                 m.add_quad_uv_double(
                     MatId::Frond,
                     p,
-                    // Across the leaflet is 0..1; along it we walk the pattern.
-                    [[0.20, 0.0], [0.02, 0.55], [0.98, 0.55], [0.80, 0.0]],
+                    [[0.0, 0.02], [0.5, 1.0], [0.5, 1.0], [0.0, 0.02]],
                 );
             }
             prev = point;
