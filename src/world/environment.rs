@@ -566,6 +566,11 @@ pub fn setup_environment(mut commands: Commands) {
             color: Color::srgb(1.0, 0.955, 0.885),
             illuminance: SUN_LUX,
             shadows_enabled: true,
+            // Large cascades over a 60 m shadow distance self-shadow badly with
+            // the defaults, which showed up as diagonal acne stripes across
+            // floors. These are scaled with the shadow distance at runtime.
+            shadow_depth_bias: 0.004,
+            shadow_normal_bias: 2.6,
             ..default()
         },
         Transform::from_rotation(sun_rotation),
@@ -715,7 +720,7 @@ pub fn apply_post_processing(
 pub fn toggle_fog_by_zone(
     mut commands: Commands,
     zone: Option<Res<super::PlayerZone>>,
-    mut ambient: ResMut<AmbientLight>,
+    ambient: Option<ResMut<AmbientLight>>,
     cameras: Query<(Entity, Option<&DistanceFog>), With<Camera3d>>,
     mut models: Query<&mut EnvironmentMapLight>,
 ) {
@@ -752,8 +757,10 @@ pub fn toggle_fog_by_zone(
         }
     }
     let target = if indoor { AMBIENT_INDOOR } else { AMBIENT_OUTDOOR };
-    if (ambient.brightness - target).abs() > 1.0 {
-        ambient.brightness = target;
+    if let Some(mut ambient) = ambient {
+        if (ambient.brightness - target).abs() > 1.0 {
+            ambient.brightness = target;
+        }
     }
 }
 
@@ -771,6 +778,11 @@ pub fn apply_shadow_settings(
     }
     for (mut light, mut cascades) in &mut suns {
         light.shadows_enabled = settings.shadows;
+        // Shadow bias has to scale with world-per-texel: a fixed value that is
+        // correct for a 45 m cascade produces acne at 130 m.
+        let scale = (settings.shadow_distance / 95.0).clamp(0.4, 1.6);
+        light.shadow_depth_bias = 0.004 * scale;
+        light.shadow_normal_bias = 2.6 * scale;
         // Cascade bounds are computed by the builder, so a changed shadow
         // distance means rebuilding the whole config, not editing fields.
         *cascades = CascadeShadowConfigBuilder {
