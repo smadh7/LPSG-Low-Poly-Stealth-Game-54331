@@ -1,0 +1,35 @@
+[2m2026-11-16T00:37:14.215370Z[0m [33m WARN[0m [2mwinit::platform_impl::linux::x11::xdisplay[0m[2m:[0m error setting XSETTINGS; Xft options won't reload automatically
+libEGL warning: DRI3 error: Could not get DRI3 device
+libEGL warning: Ensure your X server supports DRI3 to get accelerated rendering
+[2m2026-11-16T00:37:15.145728Z[0m [32m INFO[0m [2mbevy_render::renderer[0m[2m:[0m AdapterInfo { name: "llvmpipe (LLVM 20.1.2, 256 bits)", vendor: 65541, device: 0, device_type: Cpu, driver: "llvmpipe", driver_info: "Mesa 25.2.8-0ubuntu0.24.04.4 (LLVM 20.1.2)", backend: Vulkan }
+[2m2026-11-16T00:37:15.145753Z[0m [33m WARN[0m [2mbevy_render::renderer[0m[2m:[0m The selected adapter is using a driver that only supports software rendering. This is likely to be very slow. See https://bevyengine.org/learn/errors/b0006/
+[2m2026-11-16T00:37:15.224261Z[0m [32m INFO[0m [2mbevy_render::batching::gpu_preprocessing[0m[2m:[0m GPU preprocessing is fully supported on this device.
+[2m2026-11-16T00:37:15.233143Z[0m [33m WARN[0m [2mwinit::platform_impl::linux::x11::util::randr[0m[2m:[0m XRandR reported that the display's 0mm in size, which is certifiably insane
+[2m2026-11-16T00:37:15.233190Z[0m [32m INFO[0m [2mbevy_winit::system[0m[2m:[0m Creating new window HITMAN — Coral Palm Resort (0v1)
+[2m2026-11-16T00:37:15.233216Z[0m [32m INFO[0m [2mwinit::platform_impl::linux::x11::window[0m[2m:[0m Guessed window scale factor: 1
+[2m2026-11-16T00:37:15.236973Z[0m [32m INFO[0m [2mhitman_lowpoly::world::builder[0m[2m:[0m Level built: 6000 triangles of architecture, 21 static meshes, 734 prop instances
+[2m2026-11-16T00:37:15.236997Z[0m [32m INFO[0m [2mhitman_lowpoly::world[0m[2m:[0m Loaded map 'Coral Palm Resort' with 407 solids, 399 props and 14 lights
+[2m2026-11-16T00:37:15.237532Z[0m [32m INFO[0m [2mhitman_lowpoly[0m[2m:[0m CAPTURE armed for 9 viewpoints
+[2m2026-11-16T00:37:15.237546Z[0m [32m INFO[0m [2mhitman_lowpoly::world::environment[0m[2m:[0m Environment: tropical afternoon, 82000 lux sun + sky IBL (exposure EV13.6)
+[2m2026-11-16T00:37:15.237558Z[0m [32m INFO[0m [2mhitman_lowpoly[0m[2m:[0m HITMAN LOW-POLY starting — offline build
+[2m2026-11-16T00:37:15.238388Z[0m [32m INFO[0m [2mhitman_lowpoly::npc::spawn[0m[2m:[0m Spawned resort NPCs
+[2m2026-11-16T00:37:15.319550Z[0m [33m WARN[0m [2mbevy_pbr::render::mesh_view_bindings[0m[2m:[0m Too many textures in mesh pipeline view layout, this might cause us to hit `wgpu::Limits::max_sampled_textures_per_shader_stage` in some environments.
+[2m2026-11-16T00:38:01.826159Z[0m [32m INFO[0m [2mhitman_lowpoly[0m[2m:[0m CAPTURE 01_hotel -> captures/01_hotel.png (eye Vec3(0.0, 3.2, -52.0) yaw 180.0deg)
+[2m2026-11-16T00:38:03.249722Z[0m [32m INFO[0m [2mbevy_render::view::window::screenshot[0m[2m:[0m Screenshot saved to captures/01_hotel.png
+[2m2026-11-16T00:38:12.135809Z[0m [32m INFO[0m [2mhitman_lowpoly[0m[2m:[0m CAPTURE 02_lobby -> captures/02_lobby.png (eye Vec3(0.0, 2.6, 20.0) yaw 0.0deg)
+[2m2026-11-16T00:38:13.602121Z[0m [32m INFO[0m [2mbevy_render::view::window::screenshot[0m[2m:[0m Screenshot saved to captures/02_lobby.png
+[2m2026-11-16T00:38:21.638406Z[0m [32m INFO[0m [2mhitman_lowpoly[0m[2m:[0m CAPTURE 03_gardens -> captures/03_gardens.png (eye Vec3(-18.0, 1.9, 12.0) yaw 39.8deg)
+[2m2026-11-16T00:38:22.892445Z[0m [32m INFO[0m [2mbevy_render::view::window::screenshot[0m[2m:[0m Screenshot saved to captures/03_gardens.png
+[2m2026-11-16T00:38:29.593549Z[0m [32m INFO[0m [2mhitman_lowpoly[0m[2m:[0m CAPTURE 04_pool -> captures/04_pool.png (eye Vec3(46.0, 4.2, -18.0) yaw -65.8deg)
+[2m2026-11-16T00:38:30.728641Z[0m [32m INFO[0m [2mbevy_render::view::window::screenshot[0m[2m:[0m Screenshot saved to captures/04_pool.png
+[2m2026-11-16T00:38:37.982090Z[0m [32m INFO[0m [2mhitman_lowpoly[0m[2m:[0m CAPTURE 05_restaurant -> captures/05_restaurant.png (eye Vec3(52.0, 4.4, 4.0) yaw -69.4deg)
+[2m2026-11-16T00:38:39.256892Z[0m [32m INFO[0m [2mbevy_render::view::window::screenshot[0m[2m:[0m Screenshot saved to captures/05_restaurant.png
+[2m2026-11-16T00:38:47.876413Z[0m [32m INFO[0m [2mhitman_lowpoly[0m[2m:[0m CAPTURE 06_character -> captures/06_character.png (eye Vec3(0.9, 1.5, -1.0) yaw -20.6deg)
+[2m2026-11-16T00:38:49.219167Z[0m [32m INFO[0m [2mbevy_render::view::window::screenshot[0m[2m:[0m Screenshot saved to captures/06_character.png
+[2m2026-11-16T00:38:56.493543Z[0m [32m INFO[0m [2mhitman_lowpoly[0m[2m:[0m CAPTURE 07_overview -> captures/07_overview.png (eye Vec3(40.0, 22.0, -62.0) yaw -145.4deg)
+[2m2026-11-16T00:38:57.726492Z[0m [32m INFO[0m [2mbevy_render::view::window::screenshot[0m[2m:[0m Screenshot saved to captures/07_overview.png
+[2m2026-11-16T00:39:05.829405Z[0m [32m INFO[0m [2mhitman_lowpoly[0m[2m:[0m CAPTURE 08_beach -> captures/08_beach.png (eye Vec3(14.0, 2.6, -44.0) yaw -37.6deg)
+[2m2026-11-16T00:39:07.174396Z[0m [32m INFO[0m [2mbevy_render::view::window::screenshot[0m[2m:[0m Screenshot saved to captures/08_beach.png
+[2m2026-11-16T00:39:15.271475Z[0m [32m INFO[0m [2mhitman_lowpoly[0m[2m:[0m CAPTURE 09_suite -> captures/09_suite.png (eye Vec3(0.0, 15.6, 44.0) yaw 0.0deg)
+[2m2026-11-16T00:39:16.599878Z[0m [32m INFO[0m [2mbevy_render::view::window::screenshot[0m[2m:[0m Screenshot saved to captures/09_suite.png
+[2m2026-11-16T00:39:20.869936Z[0m [32m INFO[0m [2mhitman_lowpoly[0m[2m:[0m CAPTURE finished 9 viewpoints
