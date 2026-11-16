@@ -1,0 +1,22 @@
+    Checking hitman_lowpoly v1.0.0 (/home/runner/work/LPSG-Low-Poly-Stealth-Game-54331/LPSG-Low-Poly-Stealth-Game-54331)
+src/interaction/prompts.rs:57:12: warning: this `map_or` can be simplified
+src/npc/schedule.rs:54:17: warning: this `if` can be collapsed into the outer `match`
+src/npc/spawn.rs:52:55: warning: deref which would be done by auto-deref: help: try: `a`
+src/player/character.rs:750:13: warning: manual implementation of an assign operation: help: replace it with: `rotation *= Quat::from_rotation_x(joint_angle(*joint, body, phase, swing))`
+src/player/character.rs:761:13: warning: manual implementation of an assign operation: help: replace it with: `rotation *= Quat::from_rotation_x(joint_angle(limb, body, phase, swing))`
+src/ui/hud.rs:347:16: warning: this `if` statement can be collapsed
+src/ui/menu.rs:182:23: warning: very complex type used. Consider factoring parts into `type` definitions
+src/world/builder.rs:87:6: warning: very complex type used. Consider factoring parts into `type` definitions
+src/world/builder.rs:112:38: warning: very complex type used. Consider factoring parts into `type` definitions
+src/world/environment.rs:409:30: warning: casting to the same type is unnecessary (`usize` -> `usize`): help: try: `face`
+src/world/environment.rs:755:19: warning: struct update has no effect, all the fields in the struct have already been specified
+src/world/layout/build.rs:266:32: warning: this `if` has identical blocks
+src/world/layout/build.rs:545:67: error: approximate value of `f{32, 64}::consts::TAU` found
+src/world/layout/build.rs:765:5: warning: calls to `push` immediately after creation: help: consider using the `vec![]` macro: `let doors = vec![..];`
+warning: `hitman_lowpoly` (lib) generated 13 warnings
+error: could not compile `hitman_lowpoly` (lib) due to 1 previous error; 13 warnings emitted
+warning: build failed, waiting for other jobs to finish...
+src/player/character.rs:794:9: warning: this assertion has a constant value
+src/player/character.rs:795:9: warning: this assertion has a constant value
+warning: `hitman_lowpoly` (lib test) generated 15 warnings (13 duplicates)
+error: could not compile `hitman_lowpoly` (lib test) due to 1 previous error; 15 warnings emitted

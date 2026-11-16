@@ -1,0 +1,11 @@
+SHA: a1d22a9bc75367ca334eb5a7aca0b46ecae93ed7
+BRANCH: arena/f03958d0-lpsg-low-poly-stealth-game-543
+MESSAGE: fix(vegetation): translucent-looking leaves and calmer bark tiling
+
+Leaf undersides were black because an opaque leaf has no transmitted light;
+a small emissive stand-in keeps the crowns readable against a bright sky.
+
+Co-authored-by: arena-agent <297053741+arena-agent@users.noreply.github.com>
+CHECK: success
+CLIPPY: failure
+TEST: success

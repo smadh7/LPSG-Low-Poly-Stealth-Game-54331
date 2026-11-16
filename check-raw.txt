@@ -1,0 +1,5 @@
+    Updating crates.io index
+     Locking 416 packages to highest compatible versions
+      Adding bevy v0.16.1 (available: v0.20.1)
+    Checking hitman_lowpoly v1.0.0 (/home/runner/work/LPSG-Low-Poly-Stealth-Game-54331/LPSG-Low-Poly-Stealth-Game-54331)
+    Finished `dev` profile [optimized] target(s) in 2.30s
