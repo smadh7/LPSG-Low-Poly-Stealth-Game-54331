@@ -118,10 +118,13 @@ pub fn palm(m: &mut MeshBuilder, origin: Vec3, yaw: f32, scale: f32, seed: u32) 
                     tip + dir * width * 0.6,
                     root + dir * width,
                 ];
+                // V runs along the leaflet, U across it, so the leaflets in the
+                // map line up with the blade instead of being squeezed to a
+                // point at the tip.
                 m.add_quad_uv_double(
                     MatId::Frond,
                     p,
-                    [[0.0, 0.02], [0.5, 1.0], [0.5, 1.0], [0.0, 0.02]],
+                    [[0.0, 0.0], [0.5, 1.0], [1.0, 1.0], [0.5, 0.0]],
                 );
             }
             prev = point;
